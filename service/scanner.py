@@ -5,6 +5,9 @@ from folder_mtime import FolderMtime
 from needs_update import folder_changed
 from utils import get_md5, get_image_size
 from datetime import datetime
+import logging
+
+logger = logging.getLogger('scanner')
 
 IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff'}
 VIDEO_EXT = {'.mp4', '.avi', '.mov', '.mkv'}
@@ -21,9 +24,9 @@ def _scan(root_path: str, session_factory):
             if os.path.isdir(os.path.join(root_path, name)) and not name.startswith('.')]
     for folder in dirs:
         if not folder_changed(session, root_path, folder):
-            print(f"[SKIP] {folder} 无变动")
+            logger.info(f'{folder} 无变动 (SKIP)')
             continue
-        print(f"[SCAN] {folder} 开始")
+        logger.info(f'{folder} 载入 (SCAN)')
         # 先清该文件夹旧记录
         session.query(FileRecord).filter(FileRecord.root_folder == folder).delete()
         for dirpath, _, filenames in os.walk(os.path.join(root_path, folder)):
@@ -67,4 +70,4 @@ def _process_file(session: Session, root_dir: str, folder: str, dirpath: str, fi
         )
         session.merge(record)
     except Exception as e:
-        print(f"[ERROR] 处理文件失败 {file_path} : {e}")
+        logger.error(f'处理文件失败 {file_path} : {e}')
