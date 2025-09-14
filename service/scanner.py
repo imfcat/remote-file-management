@@ -9,7 +9,7 @@ import logging
 
 logger = logging.getLogger('scanner')
 
-IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff'}
+IMAGE_EXT = {'.jpg', '.jpeg', '.jpe', '.png', '.bmp', '.gif', '.tiff'}
 VIDEO_EXT = {'.mp4', '.avi', '.mov', '.mkv'}
 TEXT_EXT = {'.txt', '.md', '.log'}
 
