@@ -1,21 +1,33 @@
-# gui_server.py
+import logging
+import threading
+from pathlib import Path
 import tkinter as tk
+from tkinter import filedialog
 import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
-import threading
-import logging
-import uvicorn
-from pathlib import Path
-from database import init_db, SessionLocal
-from config_ops import set_root_dir, get_root_dir
-from main import app, ROOT_DIR, RECYCLE_FOLDER
-import os
+
+from config_ops import set_root_dir, get_root_dir, get_port, set_port
+from database import SessionLocal
+from main import DEFAULT_ROOT_DIR, DEFAULT_PORT, SERVER, run_server, stop_server
 
 LEVEL_COLOR = {
     'INFO': 'white',
     'WARNING': 'yellow',
     'ERROR': 'red'
 }
+
+def load_config():
+    with SessionLocal() as session:
+        root = get_root_dir(session) or DEFAULT_ROOT_DIR
+        port = get_port(session)   or DEFAULT_PORT
+
+        if get_root_dir(session) is None:
+            set_root_dir(session, DEFAULT_ROOT_DIR)
+        if get_port(session) is None:
+            set_port(session, str(DEFAULT_PORT))
+        return root, int(port)
+
+ROOT_DIR, PORT = load_config()
 
 class GuiLogger(logging.Handler):
     def __init__(self, text_widget):
@@ -40,7 +52,8 @@ class GuiLogger(logging.Handler):
 
 class ServerGUI(ttk.Window):
     def __init__(self):
-        super().__init__(title='图片管理服务端', themename='darkly', size=(910, 600))
+        super().__init__(title='图片管理服务端', themename='darkly', size=(940, 600))
+        self.log_text = None
         self.dir_var = None
         self.port_var = None
         self.logger = None
@@ -53,14 +66,18 @@ class ServerGUI(ttk.Window):
         top.pack(fill='x', padx=10, pady=10)
 
         ttk.Label(top, text='端口:').pack(side='left', padx=5)
-        self.port_var = tk.IntVar(value=8081)
+        self.port_var = tk.IntVar(value=int(get_port(SessionLocal()) or DEFAULT_PORT))
+        self.port_var.trace_add('write', self._save_port)
         ttk.Spinbox(top, from_=1024, to=65535, textvariable=self.port_var, width=6).pack(side='left', padx=5)
 
-        ttk.Label(top, text='ROOT_DIR:').pack(side='left', padx=5)
-        self.dir_var = tk.StringVar(value=get_root_dir(SessionLocal()) or r'C:\Windows\Web\Wallpaper')
+        ttk.Label(top, text='根目录:').pack(side='left', padx=5)
+        self.dir_var = tk.StringVar(value=get_root_dir(SessionLocal()) or DEFAULT_ROOT_DIR)
+        self.dir_var.trace_add('write', self._save_dir)
         ttk.Entry(top, textvariable=self.dir_var, width=40).pack(side='left', padx=5)
-        ttk.Button(top, text='浏览', command=self.browse_dir, bootstyle=SECONDARY).pack(side='left', padx=5)
-        ttk.Button(top, text='启动', command=self.start_server, bootstyle=SUCCESS).pack(side='left', padx=5)
+        ttk.Button(top, text='浏览', command=self.browse_dir, style=SECONDARY).pack(side='left', padx=5)
+        ttk.Button(top, text='启动', command=self.start_server, style=SUCCESS).pack(side='left', padx=5)
+        ttk.Button(top, text="停止", command=self.stop_server, style=DANGER).pack(side='left', padx=5)
+
 
         # 日志区域
         bottom = ttk.Frame(self)
@@ -76,43 +93,38 @@ class ServerGUI(ttk.Window):
         self.logger.setLevel(logging.INFO)
         self.logger.addHandler(GuiLogger(self.log_text))
 
+    def _save_port(self, *args):
+        with SessionLocal() as session:
+            set_port(session, str(self.port_var.get()))
+
+    def _save_dir(self, *args):
+        with SessionLocal() as session:
+            set_root_dir(session, self.dir_var.get())
+
     def browse_dir(self):
         path = tk.filedialog.askdirectory(title='选择图片根目录')
         if path:
             self.dir_var.set(path)
 
     def start_server(self):
-        port = self.port_var.get()
+        port = int(self.port_var.get())
         root = self.dir_var.get()
         if not Path(root).is_dir():
             ttk.dialogs.Messagebox.show_error('目录不存在！', '错误')
             return
-        # 写入配置
+
         with SessionLocal() as session:
             set_root_dir(session, root)
-        self.log('服务启动中 ...')
-        threading.Thread(target=self.run_server, args=(port, root), daemon=True).start()
+            set_port(session, str(port))
 
-    def run_server(self, port, root):
-        try:
-            global ROOT_DIR
-            ROOT_DIR = root
-            os.environ['ROOT_DIR'] = root
+        self.log('>>> 服务启动中 ...')
+        threading.Thread(target=run_server, args=('0.0.0.0', port), daemon=True).start()
 
-            for log_name in ['uvicorn', 'uvicorn.error', 'uvicorn.access', 'scanner']:
-                lg = logging.getLogger(log_name)
-                lg.handlers.clear()  # 删掉控制台
-                lg.propagate = False  # 禁止向根logger传递
-                lg.addHandler(GuiLogger(self.log_text))
-
-            root_logger = logging.getLogger()
-            root_logger.handlers.clear()
-            root_logger.addHandler(GuiLogger(self.log_text))
-
-            self.log('服务启动成功', level=logging.INFO)
-            uvicorn.run(app, host='0.0.0.0', port=port, log_config=None)
-        except Exception as e:
-            self.log(f'动失败: {e}', level=logging.ERROR)
+    def stop_server(self):
+        if stop_server():
+            self.log('>>> 服务已停止', level=logging.INFO)
+        else:
+            self.log('>>> 服务未运行', level=logging.WARNING)
 
     def poll_log(self):
         self.after(100, self.poll_log)

@@ -2,11 +2,21 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['gui_server.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=['sqlalchemy', 'sqlalchemy.orm', 'sqlalchemy.engine'],
+    hiddenimports=[
+        'config',
+        'config_ops',
+        'database',
+        'folder_mtime',
+        'main',
+        'models',
+        'needs_update',
+        'scanner',
+        'utils',
+        ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

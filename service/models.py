@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 Base = declarative_base()
 
 from folder_mtime import FolderMtime
-from config import Config
+# from config import Config
 
 class FileRecord(Base):
     __tablename__ = 'files'

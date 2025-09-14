@@ -1,6 +1,7 @@
 import os
 import sys
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -13,12 +14,27 @@ from pathlib import Path
 import urllib.parse
 import shutil
 from config_ops import get_root_dir, set_root_dir
+import threading
+import uvicorn
+from typing import Optional
 
 DEFAULT_ROOT_DIR = r"C:\Windows\Web\Wallpaper"
-RECYCLE_FOLDER = ".recycle"
-IS_RECYCLE_FOLDER = False
+DEFAULT_PORT     = 8081
 
-app = FastAPI()
+RECYCLE_FOLDER = ".recycle"
+
+IS_RECYCLE_FOLDER = False
+SERVER: Optional[uvicorn.Server] = None
+SERVER_THREAD: Optional[threading.Thread] = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _check_root_or_exit()
+    asyncio.create_task(scan_directory(ROOT_DIR, SessionLocal))
+    yield
+    print('closed')
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,9 +52,9 @@ def load_root_dir() -> str:
             return db_path
         if Path(DEFAULT_ROOT_DIR).is_dir():
             set_root_dir(session, DEFAULT_ROOT_DIR)
-            print(f"[DB] 首次写入默认目录: {DEFAULT_ROOT_DIR}")
+            print(f"[DB] 未配置使用默认目录: {DEFAULT_ROOT_DIR}")
             return DEFAULT_ROOT_DIR
-        raise RuntimeError("默认目录不存在，数据库未配置")
+        raise RuntimeError("默认目录不存在且数据库未配置")
 
 ROOT_DIR = load_root_dir()
 
@@ -62,11 +78,6 @@ def _check_root_or_exit() -> None:
         print(f"'.recycle' 目录创建失败")
 
     print(f"[OK] ROOT_DIR 检查通过: {ROOT_DIR}  含 {len(dirs)} 个一级文件夹")
-
-@app.on_event("startup")
-async def startup():
-    _check_root_or_exit()
-    asyncio.create_task(scan_directory(ROOT_DIR, SessionLocal))
 
 @app.get("/list_root_folders")
 async def list_root_folders():
@@ -150,6 +161,20 @@ async def file_content(file_path: str = Query(...)):
 
     return FileResponse(abs_path, filename=abs_path.name)
 
+def run_server(host: str, port: int):
+    global SERVER, SERVER_THREAD
+    config = uvicorn.Config(app, host=host, port=port, log_config=None)
+    SERVER = uvicorn.Server(config)
+    SERVER_THREAD = threading.current_thread()
+    SERVER.run()
+
+def stop_server():
+    global SERVER
+    if SERVER is None:
+        return False
+    SERVER.should_exit = True
+    SERVER = None
+    return True
+
 if __name__ == "__main__":
-    # _check_root_or_exit()
     uvicorn.run("main:app", host="0.0.0.0", port=8081)
