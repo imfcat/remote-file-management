@@ -100,6 +100,8 @@ def batch_thumbs(file_list, root_dir, workers: int = 8):
     root = Path(root_dir)
     cache_dir = root / '.cache'
 
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
     # 检查目录是否可写
     if not os.access(str(cache_dir), os.W_OK):
         logger.error(f".cache目录不可写：{cache_dir}，停止生成缩略图")
