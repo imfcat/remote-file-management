@@ -1,5 +1,4 @@
 import hashlib
-import os
 from PIL import Image
 
 def get_md5(file_path):

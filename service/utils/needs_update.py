@@ -1,6 +1,6 @@
 import os
 from sqlalchemy.orm import Session
-from folder_mtime import FolderMtime
+from database.models import FolderMtime
 
 def folder_changed(session: Session, root_dir: str, folder: str) -> bool:
     """True: 需要重新扫描"""
