@@ -77,10 +77,12 @@ def _process_file(session: Session, root_dir: str, folder: str, dirpath: str, fi
         elif ext in TEXT_EXT:
             file_type = 'text'
 
+        rel_path = Path(file_path).relative_to(Path(root_dir))
         md5_hash = get_md5(file_path) or 'unknown'
 
         record = FileRecord(
             file_path=file_path,
+            file=str(rel_path),
             root_folder=folder,
             file_name=file,
             file_type=file_type,
@@ -115,7 +117,7 @@ def batch_thumbs(file_list, root_dir, workers: int = 8):
         for file_path in tqdm.tqdm(file_list, desc="生成缩略图"):
             # 提交小缩略图任务
             future_thumb = pool.submit(
-                make_thumb, file_path, root_dir, 200, 'thumb'
+                make_thumb, file_path, root_dir, 300, 'thumb'
             )
             futures.append((file_path, '小', future_thumb))
 

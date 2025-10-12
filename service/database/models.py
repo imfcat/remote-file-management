@@ -27,6 +27,7 @@ class FileRecord(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="自增ID")
     file_path = Column(String, unique=True, nullable=False, comment="文件完整路径")
+    file = Column(String, nullable=False, comment="文件路径")
     root_folder = Column(String, nullable=False, comment="根文件夹")
     file_name = Column(String, nullable=False, comment="文件名")
     file_type = Column(String, nullable=False, comment="文件类型：image/video/text/other")

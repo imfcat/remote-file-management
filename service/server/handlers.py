@@ -84,7 +84,7 @@ def file_info(
 def file_content(file_path: str = Query(...)):
     from fastapi.responses import FileResponse
 
-    file_path = urllib.parse.unquote(file_path)
+    file_path = urllib.parse.unquote(f'{config.root_dir}/{file_path}')
     abs_path = Path(file_path).resolve()
     root = Path(config.root_dir).resolve()
 
