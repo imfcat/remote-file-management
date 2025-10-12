@@ -41,7 +41,7 @@ class _InitScreenState extends State<InitScreen> {
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('保存的地址已失效，请重新输入'),
+          content: Text('保存地址已失效，请重新输入'),
           backgroundColor: Colors.red,
         ),
       );

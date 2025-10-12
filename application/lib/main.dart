@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:nya_image_manage/services/thumbnail_cache.dart';
 import 'package:provider/provider.dart';
 import 'utils/backend_provider.dart';
+import 'utils/custom_cache.dart';
 import 'screens/init_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ThumbnailCache.init();
+  await initCacheDir();
   runApp(
     ChangeNotifierProvider(
       create: (_) => BackendProvider(),

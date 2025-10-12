@@ -10,10 +10,10 @@ class FolderGrid extends StatelessWidget {
     return GridView.builder(
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4, // 列布局
+        crossAxisCount: 5, // 列布局
         childAspectRatio: 1.2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
       ),
       itemCount: folders.length,
       itemBuilder: (context, index) {

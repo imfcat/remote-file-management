@@ -1,13 +1,12 @@
-import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:nya_image_manage/widget/photo_browser.dart';
 import 'package:provider/provider.dart';
 import '../services/file_record.dart';
 import '../services/api_service.dart';
 import '../services/file_url.dart';
-import '../services/thumbnail_cache.dart';
+import '../utils/custom_cache.dart';
 import '../utils/backend_provider.dart';
-import '../screens/file_browser_screen.dart';
 
 class FileGrid extends StatefulWidget {
   final String folder;
@@ -40,6 +39,18 @@ class _FileGridState extends State<FileGrid> {
     ).then((list) => _files = list);
   }
 
+  /// 拉取最新列表
+  Future<void> reload() async {
+    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+    final list = await ApiService.listFiles(
+      baseUrl: url,
+      folder: widget.folder,
+      sort: _sort,
+      order: _order,
+    );
+    setState(() => _files = list);
+  }
+
   /// 删除并局部刷新
   Future<void> _deleteFile(FileRecord f) async {
     final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
@@ -50,22 +61,13 @@ class _FileGridState extends State<FileGrid> {
   /// 缩略图
   Widget _itemWidget(BuildContext context, FileRecord f) {
     if (f.fileType == 'image') {
-      // 优先用本地缩略图
-      return FutureBuilder<File>(
-        future: ThumbnailCache.getThumbnail(f.filePath),
-        builder: (_, snap) {
-          if (snap.hasData && snap.data!.existsSync()) {
-            return Image.file(snap.data!, fit: BoxFit.cover);
-          }
-          final url = fileContentUrl(context, f.filePath);
-          return CachedNetworkImage(
-            imageUrl: url,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-            errorWidget: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white70),
-            httpHeaders: const {"Connection": "keep-alive"},
-          );
-        },
+      final url = thumbUrl(context, f.file);
+      return CachedNetworkImage(
+        imageUrl: url,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+        errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+        cacheManager: customCacheManager(),
       );
     }
 
@@ -86,7 +88,7 @@ class _FileGridState extends State<FileGrid> {
       children: [
         // 工具栏
         Container(
-          height: 80,
+          height: 60,
           color: Colors.grey[900],
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Row(
@@ -147,12 +149,19 @@ class _FileGridState extends State<FileGrid> {
                 itemBuilder: (_, i) {
                   final f = files[i];
                   return GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FileBrowserScreen(files: files, initialIndex: i),
-                      ),
-                    ),
+                    onTap: () async {
+                      final deleted = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PhotoBrowser(
+                            files: files,
+                            initialIndex: i,
+                          ),
+                        ),
+                      );
+                      if (deleted == true) reload();
+                    },
+
                     onLongPress: () => showDialog(
                       context: context,
                       builder: (_) => AlertDialog(

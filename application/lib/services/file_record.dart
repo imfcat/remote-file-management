@@ -1,5 +1,6 @@
 class FileRecord {
   final String filePath;
+  final String file;
   final String rootFolder;
   final String fileName;
   final String fileType;
@@ -10,6 +11,7 @@ class FileRecord {
 
   FileRecord({
     required this.filePath,
+    required this.file,
     required this.rootFolder,
     required this.fileName,
     required this.fileType,
@@ -21,6 +23,7 @@ class FileRecord {
 
   factory FileRecord.fromJson(Map<String, dynamic> json) => FileRecord(
     filePath: json['file_path'],
+    file: json['file'],
     rootFolder: json['root_folder'],
     fileName: json['file_name'],
     fileType: json['file_type'],

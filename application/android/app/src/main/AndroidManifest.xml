@@ -8,10 +8,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:usesCleartextTraffic="true"
-        android:label="nya_image_manage"
+        android:label="RFM"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        tools:targetApi="24">
+        tools:targetApi="24"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
