@@ -132,10 +132,14 @@ def make_thumb(originalPath: str, rootDir: str, size: int, subdir: str) -> str:
         raise ValueError(f"不支持的文件类型: {originalPath} (扩展名: {original_ext})")
 
     # 构建缩略图保存路径
-    thumb_path = cache_dir / subdir / rel_path.with_suffix(output_ext)
+    if is_video:
+        media_thumb_name = f'{rel_path.stem}{original_ext}{output_ext}'
+        thumb_path = cache_dir / subdir / rel_path.parent / media_thumb_name
+    else:
+        thumb_path = cache_dir / subdir / rel_path.with_suffix(output_ext)
+
     thumb_path = thumb_path.resolve()
     thumb_path.parent.mkdir(parents=True, exist_ok=True)
-    # logger.info(f"目标缩略图路径: {thumb_path}")
 
     # 获取原始文件的尺寸
     try:

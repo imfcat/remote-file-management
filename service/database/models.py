@@ -31,6 +31,7 @@ class FileRecord(Base):
     root_folder = Column(String, nullable=False, comment="根文件夹")
     file_name = Column(String, nullable=False, comment="文件名")
     file_type = Column(String, nullable=False, comment="文件类型：image/video/text/other")
+    mime_type = Column(String, nullable=False, comment='文件mime')
     file_size = Column(Integer, nullable=False, comment="文件大小（字节）")
     md5_hash = Column(String, nullable=False, comment="文件MD5哈希值")
     width = Column(Integer, nullable=True, comment="图片宽度（仅图片类型）")

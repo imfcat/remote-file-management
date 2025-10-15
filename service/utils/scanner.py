@@ -1,3 +1,4 @@
+import mimetypes
 import os, asyncio
 from pathlib import Path
 from sqlalchemy.orm import Session
@@ -17,21 +18,26 @@ TEXT_EXT = {'.txt', '.md', '.log'}
 
 async def scan_directory(root_path: str, session_factory):
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _scan, root_path, session_factory)
+    await loop.run_in_executor(None, _scan, Path(root_path), session_factory)
 
 
-def _scan(root_path: str, session_factory):
+def _scan(root_path: Path, session_factory):
     session = session_factory()
     try:
-        root = Path(root_path)
+        # root = Path(root_path)
+        # dirs = [name for name in os.listdir(root_path)
+        #         if os.path.isdir(os.path.join(root_path, name))
+        #         and not name.startswith('.')]
         # 获取所有一级文件夹
-        dirs = [name for name in os.listdir(root_path)
-                if os.path.isdir(os.path.join(root_path, name))
-                and not name.startswith('.')]
+        dirs = [
+            p.name for p in root_path.iterdir()
+            if p.is_dir() and not p.name.startswith('.')
+        ]
 
         all_media_files = []
         for folder in dirs:
-            if not folder_changed(session, root_path, folder):
+            folder_path = root_path / folder
+            if not folder_changed(session, str(root_path), folder):
                 logger.info(f'{folder} 无变动 (SKIP)')
                 continue
             logger.info(f'{folder} 载入 (SCAN)')
@@ -40,13 +46,14 @@ def _scan(root_path: str, session_factory):
             session.query(FileRecord).filter(FileRecord.root_folder == folder).delete()
 
             # 遍历文件夹内文件
-            for dir_path, _, filenames in os.walk(os.path.join(root_path, folder)):
+            for dir_path, _, filenames in os.walk(folder_path):
+                dir_path = Path(dir_path)
                 for file in filenames:
                     _process_file(session, root_path, folder, dir_path, file)
                     ext = os.path.splitext(file)[1].lower()
                     # 收集图片和视频文件用于生成缩略图
                     if ext in IMAGE_EXT or ext in VIDEO_EXT:
-                        all_media_files.append(os.path.join(dir_path, file))
+                        all_media_files.append(str(dir_path / file))
 
             # 批量生成两种尺寸的缩略图
             batch_thumbs(all_media_files, root_path)
@@ -59,33 +66,35 @@ def _scan(root_path: str, session_factory):
         session.close()
 
 
-def _process_file(session: Session, root_dir: str, folder: str, dirpath: str, file: str):
-    file_path = os.path.join(dirpath, file)
+def _process_file(session: Session, root_dir: Path, folder: str, dirpath: Path, file: str):
+    file_path = dirpath / file
     try:
-        stat = os.stat(file_path)
+        stat = file_path.stat()
         file_size = stat.st_size
-        file_name, ext = os.path.splitext(file)
-        ext = ext.lower()
+        file_name = file_path.name
+        ext = file_path.suffix.lower()
 
         file_type = 'other'
         width, height = None, None
         if ext in IMAGE_EXT:
             file_type = 'image'
-            width, height = get_image_size(file_path)
+            width, height = get_image_size(str(file_path))
         elif ext in VIDEO_EXT:
             file_type = 'video'
         elif ext in TEXT_EXT:
             file_type = 'text'
 
-        rel_path = Path(file_path).relative_to(Path(root_dir))
-        md5_hash = get_md5(file_path) or 'unknown'
+        mime_type = get_mime_type(str(file_path))
+        rel_path = file_path.relative_to(root_dir).as_posix()
+        md5_hash = get_md5(str(file_path)) or 'unknown'
 
         record = FileRecord(
-            file_path=file_path,
-            file=str(rel_path),
+            file_path=str(file_path),
+            file=rel_path,
             root_folder=folder,
-            file_name=file,
+            file_name=file_name,
             file_type=file_type,
+            mime_type=mime_type,
             file_size=file_size,
             md5_hash=md5_hash,
             width=width,
@@ -95,6 +104,12 @@ def _process_file(session: Session, root_dir: str, folder: str, dirpath: str, fi
         logger.info(f'添加文件 {file_path}')
     except Exception as e:
         logger.error(f'处理文件失败 {file_path} : {e}')
+
+
+def get_mime_type(file_path: str) -> str:
+    """获取文件MIME"""
+    mime_type, _ = mimetypes.guess_type(file_path)
+    return mime_type or 'application/octet-stream'
 
 
 def batch_thumbs(file_list, root_dir, workers: int = 8):
