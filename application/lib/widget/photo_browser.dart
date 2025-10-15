@@ -32,11 +32,15 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _preload(_current));
   }
 
-  void _preload(int current) {
+  void _preload(int current) async {
     final urls = widget.files.map((f) => mediumUrl(context, f.file)).toList();
-    for (int i = current - 2; i <= current + 2; i++) {
+    for (int i = current - 3; i <= current + 3; i++) {
       if (i < 0 || i >= urls.length) continue;
-      customCacheManager().getFileStream(urls[i]);
+      final url = urls[i];
+      final fileInfo = await customCacheManager().getFileFromCache(url);
+      if (fileInfo == null) {
+        customCacheManager().getFileStream(url);
+      }
     }
   }
 
@@ -100,9 +104,9 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               },
               builder: (_, index) {
                 final f = widget.files[index];
-                final url = mediumUrl(context, f.file);
-                // ① 图片 → PhotoView
+                // 图片
                 if (f.fileType == 'image') {
+                  final url = mediumUrl(context, f.file);
                   return PhotoViewGalleryPageOptions(
                     imageProvider: CachedNetworkImageProvider(
                       url,
@@ -113,7 +117,8 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                   );
                 }
 
-                // ② 视频 → Chewie（占满一页）
+                // 视频
+                final url = fileContentUrl(context, f.file);
                 return PhotoViewGalleryPageOptions.customChild(
                   child: VideoPreview(videoUrl: url),
                   minScale: PhotoViewComputedScale.contained,

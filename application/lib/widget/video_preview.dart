@@ -20,7 +20,7 @@ class _VideoPreviewState extends State<VideoPreview> {
     _vp = VideoPlayerController.network(widget.videoUrl);
     _cp = ChewieController(
       videoPlayerController: _vp,
-      autoPlay: true,
+      autoPlay: false,
       looping: false,
       showControls: true,
       allowFullScreen: true,

@@ -70,10 +70,41 @@ class _FileGridState extends State<FileGrid> {
         cacheManager: customCacheManager(),
       );
     }
+    if (f.fileType == 'video') {
+      final url = thumbUrl(context, '${f.file}.jpg');
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+              errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+              cacheManager: customCacheManager(),
+            ),
+          ),
+          Positioned(
+            right: 8,
+            bottom: 8,
+            child: Container(
+              padding: EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Icon(
+                Icons.videocam,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     // 非图片
     final iconMap = {
-      'video': Icons.videocam,
       'text': Icons.description,
     };
     return Center(
