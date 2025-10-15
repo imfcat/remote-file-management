@@ -19,10 +19,14 @@ class PhotoBrowser extends StatefulWidget {
   State<PhotoBrowser> createState() => _PhotoBrowserState();
 }
 
+enum SlideDirection { forward, backward, none }
+
 class _PhotoBrowserState extends State<PhotoBrowser> {
   late PageController _controller;
   int _current = 0;
   bool _uiVisible = true;
+  bool _hasDeleted = false;
+  SlideDirection _lastDirection = SlideDirection.none;
 
   @override
   void initState() {
@@ -68,11 +72,22 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     await ApiService.deleteFile(url, f.filePath, onDeleted: () {
       setState(() {
         widget.files.remove(f);
+        _hasDeleted = true;
         if (widget.files.isEmpty) {
           Navigator.pop(context, true);
           return;
         }
-        _controller.jumpToPage((_current - 1).clamp(0, widget.files.length - 1));
+        // 根据最后滑动方向计算跳转页码
+        int targetPage;
+        if (_lastDirection == SlideDirection.backward) {
+          targetPage = _current.clamp(0, widget.files.length - 1);
+        } else if (_lastDirection == SlideDirection.forward) {
+          targetPage = (_current - 1).clamp(0, widget.files.length - 1);
+        } else {
+          targetPage = (_current - 1).clamp(0, widget.files.length - 1);
+        }
+        _current = targetPage;
+        _controller.jumpToPage(targetPage);
       });
     });
   }
@@ -99,6 +114,12 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               itemCount: total,
               pageController: _controller,
               onPageChanged: (i) {
+                // 判断滑动方向
+                if (i > _current) {
+                  _lastDirection = SlideDirection.backward;
+                } else if (i < _current) {
+                  _lastDirection = SlideDirection.forward;
+                }
                 setState(() => _current = i);
                 _preload(i);
               },
@@ -146,7 +167,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () => Navigator.pop(context, _hasDeleted),
                       ),
                       Text(cf.fileName, style: const TextStyle(fontSize: 18)),
                     ],
