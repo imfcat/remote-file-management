@@ -9,7 +9,18 @@ RECYCLE_FOLDER = ".recycle"
 
 
 class Config:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self):
+        if hasattr(self, '_initialized'):
+            return
+        self._initialized = True
+
         init_db()
 
         with db_context() as db:

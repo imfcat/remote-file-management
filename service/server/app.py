@@ -3,16 +3,13 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from core.config import Config
+from core.config import config
 from server.handlers import (
     list_root_folders, list_files, delete_file,
     file_info, file_content
 )
 from utils.scanner import scan_directory
 from database.connection import SessionLocal
-
-
-config = Config()
 
 
 @asynccontextmanager

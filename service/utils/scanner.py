@@ -145,7 +145,8 @@ def batch_thumbs(file_list, root_dir, workers: int = 8):
         # 处理任务结果
         for file_path, size_type, future in futures:
             try:
-                thumb_path = future.result()
-                logger.info(f"{size_type}缩略图生成成功：{thumb_path}")
+                # thumb_path = future.result()
+                # logger.info(f"{size_type}缩略图生成成功：{thumb_path}")
+                future.result()
             except Exception as e:
                 logger.error(f"[Thumb] {size_type}缩略图生成失败：{file_path} → {e}")

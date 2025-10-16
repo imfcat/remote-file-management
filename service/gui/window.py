@@ -5,7 +5,7 @@ from ttkbootstrap.constants import *
 import threading
 from pathlib import Path
 import logging
-from core.config import Config
+from core.config import config
 from core.logger import GuiLogger, setup_logger
 from server.app import app
 import uvicorn
@@ -14,7 +14,7 @@ import uvicorn
 class ServerGUI(ttk.Window):
     def __init__(self):
         super().__init__(title='图片管理服务端', themename='darkly', size=(940, 600))
-        self.config = Config()
+        self.config = config
         self.logger = setup_logger("server_gui")
         self.server = None
         self.server_thread = None
