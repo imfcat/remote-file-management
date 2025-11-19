@@ -52,19 +52,64 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
 
   /// 二次确认删除
   Future<void> _deleteFile(FileRecord f) async {
-    final bool? confirm = await showDialog<bool>(
+    final bool? confirm = await showGeneralDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('删除 ${f.fileName}？'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              top: 60,
+              right: 10,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 300),
+                child: AlertDialog(
+                  insetPadding: EdgeInsets.zero,
+                  actionsPadding: EdgeInsets.zero,
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '确认删除',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                          ),
+                          Row(
+                            children: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('取消'),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('删除', style: TextStyle(color: Colors.red)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text('删除 ${f.fileName}？'),
+                    ],
+                  ),
+                  actions: const [],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
     if (confirm != true) return;
 
@@ -103,6 +148,13 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
   Widget build(BuildContext context) {
     final total = widget.files.length;
     final cf = widget.files[_current];
+    final shadows = <Shadow>[
+      Shadow(
+        offset: Offset(1.0, 1.0),
+        blurRadius: 3.0,
+        color: Color.fromARGB(255, 0, 0, 0),
+      ),
+    ];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -157,7 +209,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
             top: _uiVisible ? 0 : -60,
             left: 0, right: 0, height: 60,
             child: Container(
-              color: Colors.black54,
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -169,12 +220,23 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
                         onPressed: () => Navigator.pop(context, _hasDeleted),
                       ),
-                      Text(cf.fileName, style: const TextStyle(fontSize: 18)),
+                      Text(cf.fileName, style: TextStyle(fontSize: 18, shadows: shadows)),
                     ],
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Text(
+                        '${cf.width}x${cf.height}\n${_formatBytes(cf.fileSize)}',
+                        style: TextStyle(color: Colors.white70, fontSize: 14, shadows: shadows),
+                        textAlign: TextAlign.right
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        '${_current + 1} / $total',
+                        style: TextStyle(color: Colors.white70, fontSize: 14, shadows: shadows),
+                      ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.info_outline, color: Colors.white),
                         onPressed: () => _showInfo(context, cf),
@@ -185,31 +247,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            bottom: _uiVisible ? 0 : -60,
-            left: 0, right: 0, height: 60,
-            child: Container(
-              color: Colors.black54,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${cf.width}x${cf.height}  ${_formatBytes(cf.fileSize)}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  Text(
-                    '${_current + 1} / $total',
-                    style: const TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                  const SizedBox(width: 100),
                 ],
               ),
             ),
