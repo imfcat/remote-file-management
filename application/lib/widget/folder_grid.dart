@@ -14,7 +14,7 @@ class FolderGrid extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columnCount,
-        childAspectRatio: 1.2,
+        childAspectRatio: 1.1,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
       ),
