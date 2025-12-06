@@ -15,6 +15,8 @@ class InitScreen extends StatefulWidget {
 class _InitScreenState extends State<InitScreen> {
   final _controller = TextEditingController();
   bool _loading = false;
+  String _selectedProtocol = 'http://';
+  final List<String> _protocols = ['http://', 'https://'];
 
   @override
   void initState() {
@@ -25,6 +27,12 @@ class _InitScreenState extends State<InitScreen> {
   Future<void> _autoJumpIfConfigured() async {
     final provider = Provider.of<BackendProvider>(context, listen: false);
     await provider.loadBackendUrl();
+
+    // 如果有保存的地址，自动填充到输入框
+    if (provider.backendUrl != null && provider.backendUrl!.isNotEmpty) {
+      _fillSavedUrl(provider.backendUrl!);
+    }
+
     if (!provider.isConfigured) return;
 
     setState(() => _loading = true);
@@ -48,15 +56,33 @@ class _InitScreenState extends State<InitScreen> {
     }
   }
 
+  /// 填充保存的链接
+  void _fillSavedUrl(String savedUrl) {
+    for (final protocol in _protocols) {
+      if (savedUrl.startsWith(protocol)) {
+        setState(() {
+          _selectedProtocol = protocol;
+        });
+        final urlWithoutProtocol = savedUrl.substring(protocol.length);
+        _controller.text = urlWithoutProtocol;
+        return;
+      }
+    }
+    _controller.text = savedUrl;
+  }
+
   Future<void> _save() async {
-    final url = _controller.text.trim();
-    if (url.isEmpty) return;
+    final urlWithoutProtocol = _controller.text.trim();
+    if (urlWithoutProtocol.isEmpty) return;
+
+    // 拼接协议和地址
+    final fullUrl = '$_selectedProtocol$urlWithoutProtocol';
 
     setState(() => _loading = true);
     try {
-      await ApiService.listRootFolders(url);
+      await ApiService.listRootFolders(fullUrl);
       await Provider.of<BackendProvider>(context, listen: false)
-          .setBackendUrl(url);
+          .setBackendUrl(fullUrl);
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -105,16 +131,51 @@ class _InitScreenState extends State<InitScreen> {
                     style: TextStyle(fontSize: 24),
                   ),
                   const SizedBox(height: 20),
-                  TextField(
-                    controller: _controller,
-                    enabled: !_loading,
-                    decoration: const InputDecoration(
-                      labelText: '例：http://192.168.0.10:8081',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.url,
-                    textInputAction: TextInputAction.go,
-                    onSubmitted: (_) => _loading ? null : _save(),
+                  Row(
+                    children: [
+                      // 选择框
+                      DropdownButton<String>(
+                        value: _selectedProtocol,
+                        onChanged: _loading
+                            ? null
+                            : (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              _selectedProtocol = newValue;
+                            });
+                          }
+                        },
+                        items: _protocols
+                            .map<DropdownMenuItem<String>>((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        disabledHint: Text(_selectedProtocol),
+                        style: const TextStyle(
+                          fontSize: 16,
+                        ),
+                        underline: Container(
+                          height: 0,
+                        ),
+                      ),
+                      // 输入框
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          enabled: !_loading,
+                          decoration: const InputDecoration(
+                            labelText: '例：192.168.1.10:8081',
+                            border: OutlineInputBorder(),
+                            hintText: '请输入服务器地址和端口',
+                          ),
+                          keyboardType: TextInputType.url,
+                          textInputAction: TextInputAction.go,
+                          onSubmitted: (_) => _loading ? null : _save(),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   SizedBox(
