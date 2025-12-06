@@ -9,6 +9,7 @@ import '../services/file_url.dart';
 import '../services/api_service.dart';
 import '../utils/backend_provider.dart';
 import '../utils/custom_cache.dart';
+import '../utils/settings_provider.dart';
 
 class PhotoBrowser extends StatefulWidget {
   final List<FileRecord> files;
@@ -173,6 +174,49 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       ),
     ];
 
+    // 切换到上一页
+    void _prevPage() {
+      final settings = Provider.of<SettingsProvider>(context, listen: false);
+      if (!settings.clickToggleEnabled) return;
+      if (_current > 0) {
+        setState(() {
+          _lastDirection = SlideDirection.forward;
+          _current--;
+        });
+        _controller.animateToPage(
+          _current,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        _preload(_current);
+      }
+    }
+
+    // 切换到下一页
+    void _nextPage() {
+      final settings = Provider.of<SettingsProvider>(context, listen: false);
+      if (!settings.clickToggleEnabled) return;
+      if (_current < total - 1) {
+        setState(() {
+          _lastDirection = SlideDirection.backward;
+          _current++;
+        });
+        _controller.animateToPage(
+          _current,
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        _preload(_current);
+      }
+    }
+
+    // 监听设置状态
+    final settings = Provider.of<SettingsProvider>(context);
+    final clickToggleEnabled = settings.clickToggleEnabled;
+    final clickAreaSize = settings.clickAreaSize;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final clickAreaActualWidth = screenWidth * (clickAreaSize / 100) / 2;
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -219,6 +263,31 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               backgroundDecoration: const BoxDecoration(color: Colors.black),
             ),
           ),
+          // 上一页
+          if (clickToggleEnabled)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: clickAreaActualWidth,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _prevPage,
+              ),
+            ),
+
+            // 下一页
+          if (clickToggleEnabled)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: clickAreaActualWidth,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _nextPage,
+              ),
+            ),
 
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
