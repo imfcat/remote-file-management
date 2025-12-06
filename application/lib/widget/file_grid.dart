@@ -160,14 +160,18 @@ class _FileGridState extends State<FileGrid> {
 
     if (f.fileType == 'image') {
       final url = thumbUrl(context, f.file);
-      content = Positioned.fill(
-        child: CachedNetworkImage(
-          imageUrl: url,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-          errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
-          cacheManager: customCacheManager(),
-        )
+      content = Stack(
+        children: [
+          Positioned.fill(
+            child: CachedNetworkImage(
+              imageUrl: url,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+              errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+              cacheManager: customCacheManager(),
+            )
+          ),
+        ],
       );
     } else if (f.fileType == 'video') {
       final url = thumbUrl(context, '${f.file}.jpg');
