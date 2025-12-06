@@ -38,9 +38,26 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
 
   void _preload(int current) async {
     final urls = widget.files.map((f) => mediumUrl(context, f.file)).toList();
-    for (int i = current - 3; i <= current + 3; i++) {
-      if (i < 0 || i >= urls.length) continue;
-      final url = urls[i];
+    final List<int> cacheOrder = [];
+    cacheOrder.add(current);
+    // 缓存后n张
+    for (int i = 1; i <= 10; i++) {
+      final nextIndex = current + i;
+      if (nextIndex < urls.length) {
+        cacheOrder.add(nextIndex);
+      }
+    }
+    // 缓存前n张
+    for (int i = 1; i <= 10; i++) {
+      final prevIndex = current - i;
+      if (prevIndex >= 0) {
+        cacheOrder.add(prevIndex);
+      }
+    }
+    // 执行缓存操作
+    for (final index in cacheOrder) {
+      final url = urls[index];
+      // 检查是否已缓存
       final fileInfo = await customCacheManager().getFileFromCache(url);
       if (fileInfo == null) {
         customCacheManager().getFileStream(url);
