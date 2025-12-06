@@ -19,11 +19,10 @@ Future<void> initCacheDir() async {
   }
 }
 
+BaseCacheManager? _instance;
 BaseCacheManager customCacheManager() {
   assert(_externalCacheDirPath != null, '未初始化initCacheDir()');
-
-  return CacheManager(
-    Config(
+  _instance ??= CacheManager(Config(
       'thumb_cache',
       stalePeriod: const Duration(days: 7),
       maxNrOfCacheObjects: 10000,
@@ -32,6 +31,6 @@ BaseCacheManager customCacheManager() {
         _externalCacheDirPath!,
         'thumb_cache',
       )),
-    ),
-  );
+    ));
+  return _instance!;
 }
