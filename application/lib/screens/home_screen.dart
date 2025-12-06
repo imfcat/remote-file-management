@@ -4,6 +4,7 @@ import '../utils/backend_provider.dart';
 import '../services/api_service.dart';
 import '../utils/storage_permission.dart';
 import '../widget/folder_grid.dart';
+import 'settings_screen.dart';
 
 /// 首页
 class HomeScreen extends StatefulWidget {
@@ -41,7 +42,21 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Text('目录'),
         backgroundColor: Colors.black87,
         toolbarHeight: 60,
-        leading: Icon(Icons.perm_media)
+        leading: Icon(Icons.perm_media),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings, size: 24),
+            onPressed: () {
+              // 跳转到设置页面
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
+            tooltip: '设置',
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [

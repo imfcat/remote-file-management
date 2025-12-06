@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../utils/settings_provider.dart';
 import '../screens/file_list_screen.dart';
 
 class FolderGrid extends StatelessWidget {
@@ -7,10 +9,11 @@ class FolderGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final columnCount = Provider.of<SettingsProvider>(context).gridColumnCount;
     return GridView.builder(
       padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5, // 列布局
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columnCount,
         childAspectRatio: 1.2,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,

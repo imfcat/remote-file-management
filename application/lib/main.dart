@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'utils/settings_provider.dart';
 import 'utils/backend_provider.dart';
 import 'utils/custom_cache.dart';
 import 'screens/init_screen.dart';
@@ -10,8 +11,11 @@ void main() async {
   await initCacheDir();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => BackendProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (ctx) => BackendProvider()),
+        ChangeNotifierProvider(create: (ctx) => SettingsProvider()),
+      ],
       child: const MyApp(),
     ),
   );
