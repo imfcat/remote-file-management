@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 import logging
 from core.config import config
-from core.logger import GuiLogger, setup_logger
+from core.logger import GlobalLoggerManager, get_global_logger
 from server.app import app
 import uvicorn
 
@@ -15,15 +15,16 @@ class ServerGUI(ttk.Window):
     def __init__(self):
         super().__init__(title='图片管理服务端', themename='darkly', size=(940, 600))
         self.config = config
-        self.logger = setup_logger("server_gui")
         self.server = None
         self.server_thread = None
 
         self.log_text = None
         self.dir_var = None
         self.port_var = None
+        self.log_level_var = None
 
         self.build_ui()
+        GlobalLoggerManager().bind_gui(self.log_text, self.log_level_var)
         self.after(100, self.poll_log)
 
     def build_ui(self):
@@ -44,17 +45,21 @@ class ServerGUI(ttk.Window):
         ttk.Button(top, text='启动', command=self.start_server, style=SUCCESS).pack(side='left', padx=5)
         ttk.Button(top, text="停止", command=self.stop_server, style=DANGER).pack(side='left', padx=5)
 
+        # 日志选择
+        ttk.Label(top, text='日志级别:').pack(side='left', padx=5)
+        self.log_level_var = tk.StringVar(value='INFO')
+        log_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+        log_level_combo = ttk.Combobox(top, textvariable=self.log_level_var, values=log_levels, width=10)
+        log_level_combo.pack(side='left', padx=5)
+
         # 日志区域
         bottom = ttk.Frame(self)
-        bottom.pack(fill='both', expand=YES, padx=10, pady=10)
+        bottom.pack(fill='both', expand=YES, padx=10, pady=(0, 10))
         self.log_text = tk.Text(bottom, state='disabled', wrap='none')
-        self.log_text.pack(fill='both', expand=YES)
+        self.log_text.pack(side='left', fill='both', expand=YES)
         scroll = ttk.Scrollbar(bottom, command=self.log_text.yview)
         scroll.pack(side='right', fill='y')
         self.log_text.config(yscrollcommand=scroll.set)
-
-        # 绑定日志到GUI
-        self.logger.addHandler(GuiLogger(self.log_text))
 
     def _save_port(self, *args):
         # 保存端口配置
@@ -128,4 +133,5 @@ class ServerGUI(ttk.Window):
         self.after(100, self.poll_log)
 
     def log(self, msg, level=logging.INFO):
-        self.logger.log(level, msg)
+        logger = get_global_logger()
+        logger.log(level, msg)

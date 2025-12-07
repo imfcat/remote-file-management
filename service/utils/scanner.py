@@ -2,15 +2,13 @@ import mimetypes
 import os, asyncio
 from pathlib import Path
 from sqlalchemy.orm import Session
+from core.logger import debug, info, warning, error
 from database.models import FileRecord, FolderMtime
 from utils.needs_update import folder_changed
 from utils.utils import get_md5, get_image_size
-import logging
 from utils.thumb import make_thumb
 import tqdm
 import concurrent.futures
-
-logger = logging.getLogger('scanner')
 
 IMAGE_EXT = {'.jpg', '.jpeg', '.jpe', '.png', '.bmp', '.gif', '.tiff'}
 VIDEO_EXT = {'.mp4', '.avi', '.mov', '.mkv'}
@@ -38,9 +36,9 @@ def _scan(root_path: Path, session_factory):
         for folder in dirs:
             folder_path = root_path / folder
             if not folder_changed(session, str(root_path), folder):
-                logger.info(f'{folder} 无变动 (SKIP)')
+                info(f'{folder} 无变动 (SKIP)')
                 continue
-            logger.info(f'{folder} 载入 (SCAN)')
+            info(f'{folder} 载入 (SCAN)')
 
             # 清除该文件夹旧记录
             session.query(FileRecord).filter(FileRecord.root_folder == folder).delete()
@@ -101,9 +99,9 @@ def _process_file(session: Session, root_dir: Path, folder: str, dirpath: Path, 
             height=height
         )
         session.merge(record)
-        logger.info(f'添加文件 {file_path}')
+        debug(f'添加文件 {file_path}')
     except Exception as e:
-        logger.error(f'处理文件失败 {file_path} : {e}')
+        error(f'处理文件失败 {file_path} : {e}')
 
 
 def get_mime_type(file_path: str) -> str:
@@ -121,7 +119,7 @@ def batch_thumbs(file_list, root_dir, workers: int = 8):
 
     # 检查目录是否可写
     if not os.access(str(cache_dir), os.W_OK):
-        logger.error(f".cache目录不可写：{cache_dir}，停止生成缩略图")
+        error(f".cache目录不可写：{cache_dir}，停止生成缩略图")
         return
 
     (cache_dir / 'thumb').mkdir(parents=True, exist_ok=True)
@@ -149,4 +147,4 @@ def batch_thumbs(file_list, root_dir, workers: int = 8):
                 # logger.info(f"{size_type}缩略图生成成功：{thumb_path}")
                 future.result()
             except Exception as e:
-                logger.error(f"[Thumb] {size_type}缩略图生成失败：{file_path} → {e}")
+                error(f"[Thumb] {size_type}缩略图生成失败：{file_path} → {e}")

@@ -1,49 +1,124 @@
 import logging
-from typing import Optional
 import tkinter as tk
+from threading import Lock
 
 LEVEL_COLOR = {
+    'DEBUG': 'white',
     'INFO': 'white',
     'WARNING': 'yellow',
     'ERROR': 'red'
 }
 
-
-def setup_logger(name: Optional[str] = None, level=logging.INFO) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-
-    if not logger.handlers:
-        formatter = logging.Formatter(
-            '[%(asctime)s] [%(levelname)s] %(message)s',
-            datefmt='%H:%M:%S'
-        )
-
-        # 控制台处理
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-
-    return logger
+LEVEL_MAP = {
+    'DEBUG': logging.DEBUG,
+    'INFO': logging.INFO,
+    'WARNING': logging.WARNING,
+    'ERROR': logging.ERROR
+}
 
 
+# 全局日志管理器
+class GlobalLoggerManager:
+    _instance = None
+    _lock = Lock()
+
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    # 初始化核心日志器
+                    cls._instance.logger = logging.getLogger("global_gui_logger")
+                    cls._instance.logger.setLevel(logging.DEBUG)
+                    cls._instance.logger.propagate = False
+
+                    # 初始化GUI日志处理器
+                    cls._instance.gui_handler = None
+
+                    cls._add_console_handler(cls._instance.logger)
+        return cls._instance
+
+    @staticmethod
+    def _add_console_handler(logger):
+        """控制台日志处理器"""
+        if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+            formatter = logging.Formatter(
+                '[%(asctime)s] [%(levelname)s] %(message)s',
+                datefmt='%H:%M:%S'
+            )
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            logger.addHandler(console_handler)
+
+    def bind_gui(self, text_widget: tk.Text, log_level_var: tk.StringVar):
+        """绑定GUI的日志显示组件"""
+        # 移除旧日志
+        if self.gui_handler:
+            self.logger.removeHandler(self.gui_handler)
+
+        self.gui_handler = GuiLogger(text_widget, log_level_var)
+        self.logger.addHandler(self.gui_handler)
+
+    def get_logger(self) -> logging.Logger:
+        """获取全局日志器"""
+        return self.logger
+
+
+# GUI日志处理器
 class GuiLogger(logging.Handler):
-    def __init__(self, text_widget: tk.Text):
+    def __init__(self, text_widget: tk.Text, log_level_var: tk.StringVar):
         super().__init__()
         self.text_widget = text_widget
+        self.log_level_var = log_level_var
         self.setFormatter(logging.Formatter(
             '[%(asctime)s] [%(levelname)s] %(message)s',
             datefmt='%H:%M:%S'
         ))
 
     def emit(self, record):
-        msg = self.format(record)
-        color = LEVEL_COLOR.get(record.levelname, 'white')
-        self.text_widget.after(0, self._write, msg, color)
+        """输出日志到GUI文本框"""
+        try:
+            # 获取当前选择的日志级别
+            current_level = self.log_level_var.get()
+            current_level_val = LEVEL_MAP.get(current_level, logging.INFO)
 
-    def _write(self, msg, color):
+            # 只输出大于当前级别的日志
+            if record.levelno >= current_level_val:
+                msg = self.format(record)
+                color = LEVEL_COLOR.get(record.levelname, 'white')
+                self.text_widget.after(0, self._write_log, msg, color)
+        except Exception:
+            self.handleError(record)
+
+    def _write_log(self, msg: str, color: str):
+        """实际写入日志到文本框"""
         self.text_widget.config(state=tk.NORMAL)
         self.text_widget.tag_config(color, foreground=color)
         self.text_widget.insert(tk.END, msg + '\n', color)
         self.text_widget.config(state=tk.DISABLED)
         self.text_widget.see(tk.END)
+
+
+def get_global_logger() -> logging.Logger:
+    """获取全局日志器"""
+    return GlobalLoggerManager().get_logger()
+
+
+def debug(msg: str):
+    """输出DEBUG级日志"""
+    get_global_logger().debug(msg)
+
+
+def info(msg: str):
+    """输出INFO级日志"""
+    get_global_logger().info(msg)
+
+
+def warning(msg: str):
+    """输出WARNING级日志"""
+    get_global_logger().warning(msg)
+
+
+def error(msg: str):
+    """输出ERROR级日志"""
+    get_global_logger().error(msg)
