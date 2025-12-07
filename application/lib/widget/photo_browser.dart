@@ -27,6 +27,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
   int _current = 0;
   bool _uiVisible = true;
   bool _hasDeleted = false;
+  bool _showOriginal = false;
   SlideDirection _lastDirection = SlideDirection.none;
 
   @override
@@ -240,7 +241,11 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                 final f = widget.files[index];
                 // 图片
                 if (f.fileType == 'image') {
-                  final url = mediumUrl(context, f.file);
+                  final url = f.mimeType == 'image/gif'
+                      ? fileContentUrl(context, f.file)
+                      : (_showOriginal
+                        ? fileContentUrl(context, f.file)
+                        : mediumUrl(context, f.file));
                   return PhotoViewGalleryPageOptions(
                     imageProvider: CachedNetworkImageProvider(
                       url,
@@ -328,6 +333,13 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                         onPressed: () => _showInfo(context, cf),
                       ),
                       IconButton(
+                        icon: Icon(
+                          _showOriginal ? Icons.image : Icons.image_outlined,
+                          color: _showOriginal ? Colors.blue : Colors.white,
+                        ),
+                        onPressed: () => setState(() => _showOriginal = !_showOriginal),
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.delete, color: Colors.white),
                         onPressed: () => _deleteFile(cf),
                       ),
@@ -347,7 +359,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text(f.fileName),
-        content: Text('路径：${f.filePath}\n大小：${f.fileSize} bytes\n尺寸：${f.width}x${f.height}'),
+        content: Text('路径：${f.filePath}\n大小：${f.fileSize} bytes\n尺寸：${f.width}x${f.height}\n校验：${f.md5Hash}'),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
       ),
     );

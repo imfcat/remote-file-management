@@ -159,7 +159,7 @@ class _FileGridState extends State<FileGrid> {
     Widget content;
 
     if (f.fileType == 'image') {
-      final url = thumbUrl(context, f.file);
+      final url = thumbUrl(context, f.mimeType == 'image/gif' ? '${f.file}.jpg' : f.file);
       content = Stack(
         children: [
           Positioned.fill(
@@ -171,6 +171,23 @@ class _FileGridState extends State<FileGrid> {
               cacheManager: customCacheManager(),
             )
           ),
+          if (f.mimeType == 'image/gif')
+            Positioned(
+              right: 4,
+              bottom: 4,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(
+                  Icons.gif,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
         ],
       );
     } else if (f.fileType == 'video') {
@@ -187,8 +204,8 @@ class _FileGridState extends State<FileGrid> {
             ),
           ),
           Positioned(
-            right: 8,
-            bottom: 8,
+            right: 4,
+            bottom: 4,
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
