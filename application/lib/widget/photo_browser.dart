@@ -163,6 +163,20 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     return '${(bytes / 1048576).toStringAsFixed(1)}MB';
   }
 
+  // 切换原图
+  void _toggleOriginalWithSnackBar() {
+    setState(() {
+      _showOriginal = !_showOriginal;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          _showOriginal ? '已切换为原图显示' : '已切换为压缩图显示'
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = widget.files.length;
@@ -177,8 +191,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
 
     // 切换到上一页
     void _prevPage() {
-      final settings = Provider.of<SettingsProvider>(context, listen: false);
-      if (!settings.clickToggleEnabled) return;
       if (_current > 0) {
         setState(() {
           _lastDirection = SlideDirection.forward;
@@ -195,8 +207,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
 
     // 切换到下一页
     void _nextPage() {
-      final settings = Provider.of<SettingsProvider>(context, listen: false);
-      if (!settings.clickToggleEnabled) return;
       if (_current < total - 1) {
         setState(() {
           _lastDirection = SlideDirection.backward;
@@ -276,7 +286,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               bottom: 0,
               width: clickAreaActualWidth,
               child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
+                behavior: HitTestBehavior.opaque,
                 onTap: _prevPage,
               ),
             ),
@@ -289,7 +299,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               bottom: 0,
               width: clickAreaActualWidth,
               child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
+                behavior: HitTestBehavior.opaque,
                 onTap: _nextPage,
               ),
             ),
@@ -311,7 +321,17 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
                         onPressed: () => Navigator.pop(context, _hasDeleted),
                       ),
-                      Text(cf.fileName, style: TextStyle(fontSize: 18, shadows: shadows)),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.5,
+                        ),
+                        child: Text(
+                          cf.fileName,
+                          style: TextStyle(fontSize: 18, shadows: shadows),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
                     ],
                   ),
                   Row(
@@ -328,17 +348,21 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                         style: TextStyle(color: Colors.white70, fontSize: 14, shadows: shadows),
                       ),
                       const SizedBox(width: 8),
+                      // 信息弹窗按钮
                       IconButton(
                         icon: const Icon(Icons.info_outline, color: Colors.white),
                         onPressed: () => _showInfo(context, cf),
                       ),
+                      // 原图切换按钮
+                      if (!(cf.fileType == 'video' || cf.mimeType == 'image/gif'))
                       IconButton(
                         icon: Icon(
                           _showOriginal ? Icons.image : Icons.image_outlined,
                           color: _showOriginal ? Colors.blue : Colors.white,
                         ),
-                        onPressed: () => setState(() => _showOriginal = !_showOriginal),
+                        onPressed: _toggleOriginalWithSnackBar,
                       ),
+                      // 删除按钮
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.white),
                         onPressed: () => _deleteFile(cf),
