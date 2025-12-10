@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:waterfall_flow/waterfall_flow.dart';
 import 'package:nya_image_manage/widget/photo_browser.dart';
 import 'package:provider/provider.dart';
 import '../services/file_record.dart';
@@ -22,6 +23,9 @@ class _FileGridState extends State<FileGrid> {
   String _order = 'asc';
   late Future<List<FileRecord>> _future;
   List<FileRecord>? _files;
+  bool _isWaterfallFlow = false;
+  // 新增：缩略图尺寸切换状态（true=小缩略图/thumbUrl，false=大缩略图/mediumUrl）
+  bool _isSmallThumbnail = true;
 
   // 选择模式状态
   bool _isSelecting = false;
@@ -86,9 +90,7 @@ class _FileGridState extends State<FileGrid> {
   /// 批量删除选中文件
   Future<void> _deleteSelectedFiles() async {
     if (_selectedFiles.isEmpty) return;
-
     final int selectedCount = _selectedFiles.length;
-
     final confirm = await _showConfirmDialog(
       '批量删除确认',
       '是否确定删除选中的$selectedCount个文件？此操作不可恢复！',
@@ -145,31 +147,54 @@ class _FileGridState extends State<FileGrid> {
       if (_selectedFiles.contains(file)) {
         _selectedFiles.remove(file);
         // 如果取消后没有选中项，退出选择模式
-        if (_selectedFiles.isEmpty) {
-          _isSelecting = false;
-        }
+        if (_selectedFiles.isEmpty) _isSelecting = false;
       } else {
         _selectedFiles.add(file);
       }
     });
   }
 
-  /// 缩略图
+  /// 计算瀑布流Item高度
+  double _calculateItemHeight(BuildContext context, FileRecord f) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final padding = 8.0 * 2;
+    final crossAxisSpacing = 8.0;
+    final availableWidth = screenWidth - padding - (_crossAxisCount - 1) * crossAxisSpacing;
+    final itemWidth = availableWidth / _crossAxisCount;
+
+    final double imgWidth = f.width?.toDouble() ?? 100.0;
+    final double imgHeight = f.height?.toDouble() ?? 100.0;
+
+    if (f.fileType == 'image') {
+      return itemWidth * (imgHeight / (imgWidth == 0 ? 1.0 : imgWidth));
+    } else {
+      return itemWidth;
+    }
+  }
+
+  /// 根据状态获取缩略图URL
+  String _getThumbnailUrl(BuildContext context, FileRecord f) {
+    final targetFile = f.fileType == 'video' ? '${f.file}.jpg' : f.mimeType == 'image/gif' ? '${f.file}.jpg' : f.file;
+    return _isSmallThumbnail ? thumbUrl(context, targetFile) : mediumUrl(context, targetFile);
+  }
+
   Widget _itemWidget(BuildContext context, FileRecord f) {
     Widget content;
 
     if (f.fileType == 'image') {
-      final url = thumbUrl(context, f.mimeType == 'image/gif' ? '${f.file}.jpg' : f.file);
+      final url = _getThumbnailUrl(context, f);
       content = Stack(
         children: [
           Positioned.fill(
-            child: CachedNetworkImage(
-              imageUrl: url,
-              fit: BoxFit.cover,
-              placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-              errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
-              cacheManager: customCacheManager(),
-            )
+              child: CachedNetworkImage(
+                imageUrl: url,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
+                errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+                cacheManager: customCacheManager(),
+                // 切换缩略图时强制刷新图片
+                key: ValueKey('${url}_${_isSmallThumbnail}'),
+              )
           ),
           if (f.mimeType == 'image/gif')
             Positioned(
@@ -181,17 +206,13 @@ class _FileGridState extends State<FileGrid> {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Icon(
-                  Icons.gif,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                child: const Icon(Icons.gif, color: Colors.white, size: 24),
               ),
             ),
         ],
       );
     } else if (f.fileType == 'video') {
-      final url = thumbUrl(context, '${f.file}.jpg');
+      final url = _getThumbnailUrl(context, f);
       content = Stack(
         children: [
           Positioned.fill(
@@ -201,6 +222,7 @@ class _FileGridState extends State<FileGrid> {
               placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
               errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
               cacheManager: customCacheManager(),
+              key: ValueKey('${url}_${_isSmallThumbnail}'),
             ),
           ),
           Positioned(
@@ -212,11 +234,7 @@ class _FileGridState extends State<FileGrid> {
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Icon(
-                Icons.videocam,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: const Icon(Icons.videocam, color: Colors.white, size: 20),
             ),
           ),
         ],
@@ -234,7 +252,7 @@ class _FileGridState extends State<FileGrid> {
 
     // 如果在选择模式中，添加选中状态指示器
     if (_isSelecting) {
-      return Stack(
+      content = Stack(
         children: [
           content,
           Positioned(
@@ -244,9 +262,7 @@ class _FileGridState extends State<FileGrid> {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: _selectedFiles.contains(f)
-                    ? Colors.blueAccent
-                    : Colors.black54,
+                color: _selectedFiles.contains(f) ? Colors.blueAccent : Colors.black54,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
@@ -259,7 +275,10 @@ class _FileGridState extends State<FileGrid> {
       );
     }
 
-    return content;
+    return Container(
+      color: Colors.grey[850],
+      child: content,
+    );
   }
 
   @override
@@ -305,6 +324,24 @@ class _FileGridState extends State<FileGrid> {
                   label: _crossAxisCount.toString(),
                   onChanged: (v) => setState(() => _crossAxisCount = v.round()),
                 ),
+                // 布局切换按钮
+                IconButton(
+                  icon: Icon(
+                    _isWaterfallFlow ? Icons.dashboard : Icons.grid_view,
+                    color: Colors.white,
+                  ),
+                  tooltip: _isWaterfallFlow ? '切换到网格布局' : '切换到瀑布流布局',
+                  onPressed: () => setState(() => _isWaterfallFlow = !_isWaterfallFlow),
+                ),
+                // 缩略图尺寸切换按钮
+                IconButton(
+                  icon: Icon(
+                    _isSmallThumbnail ? Icons.zoom_out : Icons.zoom_in,
+                    color: Colors.white,
+                  ),
+                  tooltip: _isSmallThumbnail ? '切换到大缩略图' : '切换到小缩略图',
+                  onPressed: () => setState(() => _isSmallThumbnail = !_isSmallThumbnail),
+                ),
                 const Spacer(),
                 DropdownButton<String>(
                   value: '$_sort-$_order',
@@ -333,52 +370,91 @@ class _FileGridState extends State<FileGrid> {
             ),
           ),
 
-        // 网格
         Expanded(
           child: FutureBuilder<List<FileRecord>>(
             future: _future,
             builder: (_, snap) {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              final files = _files = snap.data!;
-              return GridView.builder(
+              final files = snap.data!;
+
+              // 网格布局
+              if (!_isWaterfallFlow) {
+                return GridView.builder(
+                  padding: const EdgeInsets.all(8),
+                  cacheExtent: 200,
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: _crossAxisCount,
+                    childAspectRatio: 1,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                  ),
+                  itemCount: files.length,
+                  itemBuilder: (_, i) {
+                    final f = files[i];
+                    return GestureDetector(
+                      onTap: () async {
+                        if (_isSelecting) {
+                          _toggleFileSelection(f);
+                        } else {
+                          final deleted = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PhotoBrowser(files: files, initialIndex: i),
+                            ),
+                          );
+                          if (deleted == true) reload();
+                        }
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          _isSelecting = true;
+                          _selectedFiles.add(f);
+                        });
+                      },
+                      child: _itemWidget(context, f),
+                    );
+                  },
+                );
+              }
+
+              // 瀑布流布局
+              return WaterfallFlow.builder(
                 padding: const EdgeInsets.all(8),
                 cacheExtent: 200,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
                   crossAxisCount: _crossAxisCount,
-                  childAspectRatio: 1,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8.0,
+                  mainAxisSpacing: 8.0,
+                  lastChildLayoutTypeBuilder: (index) =>
+                  index == files.length ? LastChildLayoutType.foot : LastChildLayoutType.none,
                 ),
                 itemCount: files.length,
                 itemBuilder: (_, i) {
                   final f = files[i];
-                  return GestureDetector(
-                    // 选择模式下点击切换选择状态，否则进入浏览
-                    onTap: () async {
-                      if (_isSelecting) {
-                        _toggleFileSelection(f);
-                      } else {
-                        final deleted = await Navigator.push<bool>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PhotoBrowser(
-                              files: files,
-                              initialIndex: i,
+                  final itemHeight = _calculateItemHeight(context, f);
+
+                  return SizedBox(
+                    height: itemHeight,
+                    child: GestureDetector(
+                      onTap: () async {
+                        if (_isSelecting) {
+                          _toggleFileSelection(f);
+                        } else {
+                          final deleted = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PhotoBrowser(files: files, initialIndex: i),
                             ),
-                          ),
-                        );
-                        if (deleted == true) reload();
-                      }
-                    },
-                    // 长按进入选择模式并选中当前文件
-                    onLongPress: () {
-                      setState(() {
-                        _isSelecting = true;
-                        _selectedFiles.add(f);
-                      });
-                    },
-                    child: Container(
-                      color: Colors.grey[850],
+                          );
+                          if (deleted == true) reload();
+                        }
+                      },
+                      onLongPress: () {
+                        setState(() {
+                          _isSelecting = true;
+                          _selectedFiles.add(f);
+                        });
+                      },
                       child: _itemWidget(context, f),
                     ),
                   );
