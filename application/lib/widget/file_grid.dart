@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../services/file_url.dart';
 import '../utils/custom_cache.dart';
 import '../utils/backend_provider.dart';
+import '../utils/settings_provider.dart';
 
 class FileGrid extends StatefulWidget {
   final String folder;
@@ -23,9 +24,7 @@ class _FileGridState extends State<FileGrid> {
   String _order = 'asc';
   late Future<List<FileRecord>> _future;
   List<FileRecord>? _files;
-  bool _isWaterfallFlow = false;
-  // 新增：缩略图尺寸切换状态（true=小缩略图/thumbUrl，false=大缩略图/mediumUrl）
-  bool _isSmallThumbnail = true;
+
 
   // 选择模式状态
   bool _isSelecting = false;
@@ -175,11 +174,15 @@ class _FileGridState extends State<FileGrid> {
   /// 根据状态获取缩略图URL
   String _getThumbnailUrl(BuildContext context, FileRecord f) {
     final targetFile = f.fileType == 'video' ? '${f.file}.jpg' : f.mimeType == 'image/gif' ? '${f.file}.jpg' : f.file;
-    return _isSmallThumbnail ? thumbUrl(context, targetFile) : mediumUrl(context, targetFile);
+    final settings = Provider.of<SettingsProvider>(context);
+    final isSmallThumbnail = settings.isSmallThumbnail;
+    return isSmallThumbnail ? thumbUrl(context, targetFile) : mediumUrl(context, targetFile);
   }
 
   Widget _itemWidget(BuildContext context, FileRecord f) {
     Widget content;
+    final settings = Provider.of<SettingsProvider>(context);
+    final isSmallThumbnail = settings.isSmallThumbnail;
 
     if (f.fileType == 'image') {
       final url = _getThumbnailUrl(context, f);
@@ -193,7 +196,7 @@ class _FileGridState extends State<FileGrid> {
                 errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
                 cacheManager: customCacheManager(),
                 // 切换缩略图时强制刷新图片
-                key: ValueKey('${url}_${_isSmallThumbnail}'),
+                key: ValueKey('${url}_${isSmallThumbnail}'),
               )
           ),
           if (f.mimeType == 'image/gif')
@@ -222,7 +225,7 @@ class _FileGridState extends State<FileGrid> {
               placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
               errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
               cacheManager: customCacheManager(),
-              key: ValueKey('${url}_${_isSmallThumbnail}'),
+              key: ValueKey('${url}_${isSmallThumbnail}'),
             ),
           ),
           Positioned(
@@ -254,7 +257,22 @@ class _FileGridState extends State<FileGrid> {
     if (_isSelecting) {
       content = Stack(
         children: [
-          content,
+          if (_selectedFiles.contains(f)) ...[
+            Transform.scale(
+              scale: 0.99,
+              alignment: Alignment.center,
+              child: Stack(
+                children: [
+                  content,
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          ] else ...[content],
           Positioned(
             top: 4,
             right: 4,
@@ -283,6 +301,10 @@ class _FileGridState extends State<FileGrid> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = Provider.of<SettingsProvider>(context);
+    final crossAxisCount = settings.fileListColumnCount;
+    final isWaterfallFlow = settings.isWaterfallFlow;
+    final isSmallThumbnail = settings.isSmallThumbnail;
     return Column(
       children: [
         // 选择模式工具栏
@@ -317,30 +339,30 @@ class _FileGridState extends State<FileGrid> {
               children: [
                 const Text('列数：', style: TextStyle(color: Colors.white)),
                 Slider(
-                  value: _crossAxisCount.toDouble(),
+                  value: crossAxisCount.toDouble(),
                   min: 1,
                   max: 20,
                   divisions: 19,
-                  label: _crossAxisCount.toString(),
-                  onChanged: (v) => setState(() => _crossAxisCount = v.round()),
+                  label: crossAxisCount.toString(),
+                  onChanged: (v) => Provider.of<SettingsProvider>(context, listen: false).setFileListColumnCount(v.round()),
                 ),
                 // 布局切换按钮
                 IconButton(
                   icon: Icon(
-                    _isWaterfallFlow ? Icons.dashboard : Icons.grid_view,
+                    isWaterfallFlow  ? Icons.dashboard : Icons.grid_view,
                     color: Colors.white,
                   ),
-                  tooltip: _isWaterfallFlow ? '切换到网格布局' : '切换到瀑布流布局',
-                  onPressed: () => setState(() => _isWaterfallFlow = !_isWaterfallFlow),
+                  tooltip: isWaterfallFlow  ? '切换到网格布局' : '切换到瀑布流布局',
+                  onPressed: () => Provider.of<SettingsProvider>(context, listen: false).toggleWaterfallFlow(!isWaterfallFlow),
                 ),
                 // 缩略图尺寸切换按钮
                 IconButton(
                   icon: Icon(
-                    _isSmallThumbnail ? Icons.zoom_out : Icons.zoom_in,
+                    isSmallThumbnail  ? Icons.zoom_out : Icons.zoom_in,
                     color: Colors.white,
                   ),
-                  tooltip: _isSmallThumbnail ? '切换到大缩略图' : '切换到小缩略图',
-                  onPressed: () => setState(() => _isSmallThumbnail = !_isSmallThumbnail),
+                  tooltip: isSmallThumbnail  ? '切换到大缩略图' : '切换到小缩略图',
+                  onPressed: () => Provider.of<SettingsProvider>(context, listen: false).toggleThumbnailSize(!isSmallThumbnail),
                 ),
                 const Spacer(),
                 DropdownButton<String>(
@@ -378,12 +400,12 @@ class _FileGridState extends State<FileGrid> {
               final files = snap.data!;
 
               // 网格布局
-              if (!_isWaterfallFlow) {
+              if (!isWaterfallFlow) {
                 return GridView.builder(
                   padding: const EdgeInsets.all(8),
                   cacheExtent: 200,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: _crossAxisCount,
+                    crossAxisCount: crossAxisCount,
                     childAspectRatio: 1,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
@@ -422,7 +444,7 @@ class _FileGridState extends State<FileGrid> {
                 padding: const EdgeInsets.all(8),
                 cacheExtent: 200,
                 gridDelegate: SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: _crossAxisCount,
+                  crossAxisCount: crossAxisCount,
                   crossAxisSpacing: 8.0,
                   mainAxisSpacing: 8.0,
                   lastChildLayoutTypeBuilder: (index) =>

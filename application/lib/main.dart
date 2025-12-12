@@ -14,7 +14,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (ctx) => BackendProvider()),
-        ChangeNotifierProvider(create: (ctx) => SettingsProvider()),
+        ChangeNotifierProvider(create: (ctx) => SettingsProvider()..init()),
       ],
       child: const MyApp(),
     ),

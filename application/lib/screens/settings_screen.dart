@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../utils/settings_provider.dart';
@@ -10,10 +11,14 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
+enum SettingItemType {
+  numberInput,
+  slider,
+}
+
 class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '...';
-  final TextEditingController _columnController = TextEditingController(); // 弹窗输入框控制器
-  final TextEditingController _areaSizeController = TextEditingController(); // 区域大小输入控制器
+  final TextEditingController _columnController = TextEditingController();
 
   @override
   void initState() {
@@ -21,128 +26,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _getAppVersion();
   }
 
+  @override
+  void dispose() {
+    _columnController.dispose();
+    super.dispose();
+  }
+
+  // 获取应用版本号
   Future<void> _getAppVersion() async {
-    final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    final packageInfo = await PackageInfo.fromPlatform();
     setState(() {
       _appVersion = 'v${packageInfo.version}+${packageInfo.buildNumber}';
     });
   }
 
-  void _showColumnEditDialog(int currentValue) {
+  Future<void> _showNumberInputDialog({
+    required String title,
+    required String hintText,
+    required int currentValue,
+    required int minValue,
+    required int maxValue,
+    required Function(int) onSave,
+    String successMsg = '设置成功',
+  }) async {
     _columnController.text = currentValue.toString();
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('修改网格列数'),
+        title: Text(title),
         content: TextField(
           controller: _columnController,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            hintText: '1-8之间的数',
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: InputDecoration(
+            hintText: hintText,
+            border: const OutlineInputBorder(),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           ),
           autofocus: true,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
         ),
         actions: [
-          TextButton(
+          _buildDialogAction(
+            text: '取消',
             onPressed: () {
               Navigator.pop(ctx);
               _columnController.clear();
             },
-            child: const Text('取消'),
           ),
-          TextButton(
+          _buildDialogAction(
+            text: '确认',
             onPressed: () {
-              final int? newValue = int.tryParse(_columnController.text);
-              if (newValue == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('请输入有效的数字')),
-                );
-                return;
-              }
-              if (newValue < 1 || newValue > 8) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('列数请设置为1-8之间')),
-                );
-                return;
-              }
-              // 保存新值
-              Provider.of<SettingsProvider>(context, listen: false)
-                  .setGridColumnCount(newValue);
+              final newValue = int.tryParse(_columnController.text);
+              if (!_validateNumberInput(newValue, minValue, maxValue)) return;
+
+              onSave(newValue!);
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('列数设置成功')),
-              );
+              _columnController.clear();
+              _showSnackBar(successMsg);
             },
-            child: const Text('确认'),
           ),
         ],
       ),
     );
   }
 
-  // 显示区域大小设置对话框
-  void _showAreaSizeEditDialog(int currentValue) {
-    int _tempValue = currentValue;
+  // 通用滑块调节弹窗
+  Future<void> _showSliderDialog({
+    required String title,
+    required String subTitle,
+    required int currentValue,
+    required int minValue,
+    required int maxValue,
+    required int divisions,
+    required String unit,
+    required Function(int) onSave,
+    String successMsg = '设置成功',
+  }) async {
+    int tempValue = currentValue;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogContext, setStateDialog) {
           return AlertDialog(
-            title: const Text('修改点击切换区域大小'),
+            title: Text(title),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
-                  '数值为屏幕宽度的百分比，建议设置20-80%',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                Text(
+                  subTitle,
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('区域大小：'),
+                    const Text('当前值：'),
                     Text(
-                      '$_tempValue%',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      '$tempValue$unit',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
                 Slider(
-                  value: _tempValue.toDouble(),
-                  min: 1,
-                  max: 100,
-                  divisions: 99,
-                  label: '$_tempValue%',
-                  onChanged: (double value) {
-                    setStateDialog(() {
-                      _tempValue = value.toInt();
-                    });
-                  },
+                  value: tempValue.toDouble(),
+                  min: minValue.toDouble(),
+                  max: maxValue.toDouble(),
+                  divisions: divisions,
+                  label: '$tempValue$unit',
+                  onChanged: (value) => setStateDialog(() => tempValue = value.toInt()),
                 ),
               ],
             ),
             actions: [
-              TextButton(
+              _buildDialogAction(
+                text: '取消',
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('取消'),
               ),
-              TextButton(
+              _buildDialogAction(
+                text: '确认',
                 onPressed: () {
-                  Provider.of<SettingsProvider>(context, listen: false)
-                      .setClickAreaSize(_tempValue);
+                  onSave(tempValue);
                   Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('点击区域大小已设为 $_tempValue%！')),
-                  );
+                  _showSnackBar('$successMsg $tempValue$unit！');
                 },
-                child: const Text('确认'),
               ),
             ],
           );
@@ -151,19 +161,173 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _columnController.dispose();
-    _areaSizeController.dispose();
-    super.dispose();
+  // 通用数字输入校验
+  bool _validateNumberInput(int? value, int min, int max) {
+    if (value == null) {
+      _showSnackBar('请输入有效的数字');
+      return false;
+    }
+    if (value < min || value > max) {
+      _showSnackBar('请输入$min-$max之间的数字');
+      return false;
+    }
+    return true;
   }
+
+  // 构建对话框按钮
+  Widget _buildDialogAction({required String text, required VoidCallback onPressed}) {
+    return TextButton(
+      onPressed: onPressed,
+      child: Text(text),
+    );
+  }
+
+  // 显示提示消息
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  // 构建可点击的设置项
+  Widget _buildClickableSettingItem({
+    required String title,          // 标题
+    required String value,          // 当前显示值
+    required SettingItemType type,  // 交互类型（数字输入/滑块）
+    required int currentValue,      // 当前实际值（用于弹窗初始化）
+    String? dialogTitle,            // 弹窗标题（默认使用设置项标题）
+    String? hintText,               // 数字输入弹窗提示文本
+    String? sliderSubTitle,         // 滑块弹窗副标题
+    int minValue = 1,               // 最小值（数字/滑块通用）
+    int maxValue = 100,             // 最大值（数字/滑块通用）
+    int divisions = 99,             // 滑块分割数
+    String unit = '',               // 单位（如%、列）
+    required Function(int) onSave,  // 保存回调
+    String successMsg = '设置成功',  // 成功提示语
+  }) {
+    void _handleTap() {
+      switch (type) {
+        case SettingItemType.numberInput:
+          _showNumberInputDialog(
+            title: dialogTitle ?? title,
+            hintText: hintText ?? '$minValue-$maxValue之间的数',
+            currentValue: currentValue,
+            minValue: minValue,
+            maxValue: maxValue,
+            onSave: onSave,
+            successMsg: successMsg,
+          );
+          break;
+        case SettingItemType.slider:
+          _showSliderDialog(
+            title: dialogTitle ?? title,
+            subTitle: sliderSubTitle ?? '',
+            currentValue: currentValue,
+            minValue: minValue,
+            maxValue: maxValue,
+            divisions: divisions,
+            unit: unit,
+            onSave: onSave,
+            successMsg: successMsg,
+          );
+          break;
+      }
+    }
+
+    return InkWell(
+      onTap: _handleTap,
+      child: _buildSettingItemContainer(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: _titleTextStyle),
+            Row(
+              children: [
+                Text(
+                  value.isEmpty ? '未设置' : value,
+                  style: _valueTextStyle,
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 构建带开关的设置项
+  Widget _buildSwitchSettingItem({
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required String enableMsg,
+    required String disableMsg,
+  }) {
+    void _handleSwitchChange(bool newValue) {
+      onChanged(newValue);
+      _showSnackBar(newValue ? enableMsg : disableMsg);
+    }
+
+    return InkWell(
+      onTap: () => _handleSwitchChange(!value),
+      child: _buildSettingItemContainer(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: _titleTextStyle),
+            SizedBox(
+              width: 40,
+              height: 24,
+              child: Transform.scale(
+                scale: 0.8,
+                alignment: Alignment.center,
+                child: Switch(
+                  value: value,
+                  onChanged: _handleSwitchChange,
+                  activeThumbColor: Colors.blue,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  activeTrackColor: Colors.blue.withValues(alpha: 0.3),
+                  inactiveTrackColor: Colors.grey.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 设置项容器
+  Widget _buildSettingItemContainer({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Color(0xFF333333), width: 0.3),
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  // 标题文本样式
+  final TextStyle _titleTextStyle = const TextStyle(
+    fontSize: 16,
+    fontWeight: FontWeight.w500,
+  );
+
+  // 值文本样式
+  final TextStyle _valueTextStyle = TextStyle(
+    fontSize: 16,
+    color: Colors.grey[600],
+  );
 
   @override
   Widget build(BuildContext context) {
-    // 监听当前
-    final currentColumnCount = Provider.of<SettingsProvider>(context).gridColumnCount;
-    final clickToggleEnabled = Provider.of<SettingsProvider>(context).clickToggleEnabled;
-    final clickAreaSize = Provider.of<SettingsProvider>(context).clickAreaSize;
+    final settings = Provider.of<SettingsProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -177,124 +341,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       body: Column(
         children: [
-          // 设置项列表
           Expanded(
             child: ListView(
               children: [
-                // 网格列数设置项
-                InkWell(
-                  onTap: () => _showColumnEditDialog(currentColumnCount),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 18
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          '文件夹网格列数',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              currentColumnCount.toString(),
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: Colors.grey[400],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // 点击切换开关选项
+                const SizedBox(height: 16),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 18
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        '启用点击切换功能',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Switch(
-                        value: clickToggleEnabled,
-                        onChanged: (value) {
-                          Provider.of<SettingsProvider>(context, listen: false)
-                              .toggleClickEnabled(value);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  value ? '已开启点击切换' : '已关闭点击切换'
-                              ),
-                            ),
-                          );
-                        },
-                        activeColor: Colors.blue,
-                      ),
-                    ],
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('目录页', style: TextStyle( color: Colors.grey[600])),
                 ),
-                // 点击区域大小设置项
-                InkWell(
-                  onTap: () => _showAreaSizeEditDialog(clickAreaSize),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 18
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          '点击区域大小',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            Text(
-                              '${clickAreaSize} %',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: Colors.grey[400],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
+                _buildClickableSettingItem(
+                  title: '文件夹网格列数',
+                  value: settings.gridColumnCount.toString(),
+                  type: SettingItemType.numberInput,
+                  currentValue: settings.gridColumnCount,
+                  dialogTitle: '修改网格列数',
+                  hintText: '1-8之间的数',
+                  minValue: 1,
+                  maxValue: 8,
+                  successMsg: '列数设置成功',
+                  onSave: (value) => settings.setGridColumnCount(value),
+                ),
+
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('文件页', style: TextStyle( color: Colors.grey[600])),
+                ),
+                _buildClickableSettingItem(
+                  title: '文件列表列数',
+                  value: settings.fileListColumnCount.toString(),
+                  type: SettingItemType.numberInput,
+                  currentValue: settings.fileListColumnCount,
+                  dialogTitle: '修改网格列数',
+                  hintText: '1-20之间的数',
+                  minValue: 1,
+                  maxValue: 20,
+                  successMsg: '列数设置成功',
+                  onSave: (value) => settings.setFileListColumnCount(value),
+                ),
+                _buildSwitchSettingItem(
+                  title: '瀑布流布局',
+                  value: settings.isWaterfallFlow,
+                  onChanged: settings.toggleWaterfallFlow,
+                  enableMsg: '已切换到瀑布流布局',
+                  disableMsg: '已切换到网格布局',
+                ),
+                _buildSwitchSettingItem(
+                  title: '小缩略图模式',
+                  value: settings.isSmallThumbnail,
+                  onChanged: settings.toggleThumbnailSize,
+                  enableMsg: '已切换到小缩略图',
+                  disableMsg: '已切换到大缩略图',
+                ),
+
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('浏览页', style: TextStyle( color: Colors.grey[600])),
+                ),
+                _buildSwitchSettingItem(
+                  title: '点击切换功能',
+                  value: settings.clickToggleEnabled,
+                  onChanged: settings.toggleClickEnabled,
+                  enableMsg: '已开启点击切换',
+                  disableMsg: '已关闭点击切换',
+                ),
+                _buildClickableSettingItem(
+                  title: '点击区域大小',
+                  value: '${settings.clickAreaSize}%',
+                  type: SettingItemType.slider,
+                  currentValue: settings.clickAreaSize,
+                  dialogTitle: '修改点击切换区域大小',
+                  sliderSubTitle: '数值为屏幕宽度的百分比',
+                  minValue: 1,
+                  maxValue: 100,
+                  divisions: 99,
+                  unit: '%',
+                  successMsg: '点击区域大小已设为',
+                  onSave: (value) => settings.setClickAreaSize(value),
                 ),
               ],
             ),
           ),
-          // 底部版本号
+
+          // 版本信息
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
             child: Text(
