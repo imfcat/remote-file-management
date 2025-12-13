@@ -9,6 +9,7 @@ import '../services/file_url.dart';
 import '../utils/custom_cache.dart';
 import '../utils/backend_provider.dart';
 import '../utils/settings_provider.dart';
+import '../screens/image_compare.dart';
 
 class FileGrid extends StatefulWidget {
   final String folder;
@@ -149,6 +150,13 @@ class _FileGridState extends State<FileGrid> {
         _selectedFiles.add(file);
       }
     });
+  }
+
+  /// 判断是否选中了两张图片
+  bool _isTwoImagesSelected() {
+    if (_selectedFiles.length != 2) return false;
+    final List<FileRecord> files = _selectedFiles.toList();
+    return files[0].fileType == 'image' && files[1].fileType == 'image';
   }
 
   /// 计算瀑布流Item高度
@@ -318,6 +326,27 @@ class _FileGridState extends State<FileGrid> {
                 Text('已选择: ${_selectedFiles.length}',
                     style: const TextStyle(color: Colors.white)),
                 const Spacer(),
+                // 图片对比按钮
+                if (_isTwoImagesSelected())
+                  TextButton(
+                    onPressed: () {
+                      final List<FileRecord> selectedImages = _selectedFiles.toList();
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ImageComparePage(
+                            image1: selectedImages[0],
+                            image2: selectedImages[1],
+                            backendUrl: Provider.of<BackendProvider>(context, listen: false).backendUrl!,
+                          ),
+                        ),
+                      ).then((_) => _exitSelectMode());
+                    },
+                    child: const Text(
+                      '图片对比',
+                      style: TextStyle(color: Colors.blueAccent),
+                    ),
+                  ),
                 TextButton(
                   onPressed: _exitSelectMode,
                   child: const Text('取消', style: TextStyle(color: Colors.white)),
