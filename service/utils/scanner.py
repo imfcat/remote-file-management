@@ -32,9 +32,9 @@ def _scan(root_path: Path, session_factory):
         for folder in dirs:
             folder_path = root_path / folder
             if not folder_changed(session, str(root_path), folder):
-                info(f'{folder} 无变动 (SKIP)')
+                info(f'(SKIP) {folder} 无变动')
                 continue
-            info(f'{folder} 载入 (SCAN)')
+            info(f'(SCAN) {folder} 载入')
             count_files = 0
 
             # 清除该文件夹旧记录
@@ -56,6 +56,25 @@ def _scan(root_path: Path, session_factory):
             # 更新文件夹时间戳
             mtime = os.stat(os.path.join(root_path, folder)).st_mtime
             session.merge(FolderRecord(folder=folder, last_mtime=mtime, count=count_files))
+
+
+        # 清除数据库中有但实际不存在的文件夹
+        db_folders = [row[0] for row in session.query(FolderRecord.folder).all()]
+        deleted_folders = [f for f in db_folders if f not in dirs]
+        if deleted_folders:
+            warning(f'(CLEAN) {deleted_folders} 已不存在，将清理')
+
+            # 删除关联的FileRecord
+            delete_file_count = session.query(FileRecord).filter(
+                FileRecord.root_folder.in_(deleted_folders)
+            ).delete(synchronize_session=False)
+            warning(f'(CLEAN) 清理关联文件记录数 {delete_file_count}')
+
+            # 删除FolderRecord
+            delete_folder_count = session.query(FolderRecord).filter(
+                FolderRecord.folder.in_(deleted_folders)
+            ).delete(synchronize_session=False)
+            warning(f'(CLEAN) 清理文件夹记录数 {delete_folder_count}')
 
         session.commit()
     finally:
