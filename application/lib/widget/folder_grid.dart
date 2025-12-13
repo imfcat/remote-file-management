@@ -1,44 +1,141 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import '../utils/backend_provider.dart';
 import '../utils/settings_provider.dart';
+import '../services/folder_record.dart';
 import '../screens/file_list_screen.dart';
+import '../services/api_service.dart';
 
-class FolderGrid extends StatelessWidget {
-  final List<String> folders;
-  const FolderGrid({super.key, required this.folders});
+class FolderGrid extends StatefulWidget {
+  final List<Folder> folders;
+  final Function(Folder, String)? onFolderMarkUpdated;
+
+  const FolderGrid({
+    super.key,
+    required this.folders,
+    this.onFolderMarkUpdated,
+  });
+
+  @override
+  State<FolderGrid> createState() => _FolderGridState();
+}
+
+class _FolderGridState extends State<FolderGrid> {
+  // 解析颜色
+  Color _parseFolderColor(Folder folder) {
+    if (folder.mark == null || folder.mark!.isEmpty) {
+      return Colors.amber;
+    }
+    try {
+      String colorHex = folder.mark!.replaceAll('#', '0xFF');
+      return Color(int.parse(colorHex));
+    } catch (e) {
+      return Colors.amber;
+    }
+  }
+
+  // 显示颜色选择弹窗
+  void _showColorPickerDialog(BuildContext context, Folder folder) async {
+    Color selectedColor = _parseFolderColor(folder);
+
+    await showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('设置文件夹颜色'),
+          content: SingleChildScrollView(
+            child: BlockPicker(
+              pickerColor: selectedColor,
+              onColorChanged: (Color color) {
+                selectedColor = color;
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                // 颜色转换
+                String colorMark = '#${selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+
+                try {
+                  final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+                  await ApiService.setFolderMark(url, folder.folderName, colorMark);
+
+                  setState(() {
+                    final folderIndex = widget.folders.indexOf(folder);
+                    if (folderIndex != -1) {
+                      widget.folders[folderIndex] = Folder(
+                        folderName: folder.folderName,
+                        count: folder.count,
+                        mark: colorMark,
+                        lastMtime: null,
+                      );
+                    }
+                  });
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('设置失败：$e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('确认'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final columnCount = Provider.of<SettingsProvider>(context).gridColumnCount;
     return GridView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columnCount,
         childAspectRatio: 1.1,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
+        crossAxisSpacing: 2,
+        mainAxisSpacing: 2,
       ),
-      itemCount: folders.length,
+      itemCount: widget.folders.length,
       itemBuilder: (context, index) {
-        final folder = folders[index];
+        final folder = widget.folders[index];
+        final folderColor = _parseFolderColor(folder);
+
         return Card(
-          elevation: 4,
+          elevation: 0,
+          color: Colors.transparent,
           child: InkWell(
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => FileListScreen(folder: folder),
+                builder: (_) => FileListScreen(folder: folder.folderName),
               ),
             ),
+            onLongPress: () => _showColorPickerDialog(context, folder),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.folder, size: 64, color: Colors.amber),
-                const SizedBox(height: 8),
+                Icon( Icons.folder, size: 64, color: folderColor, ),
                 Text(
-                  folder,
-                  style: const TextStyle(fontSize: 18),
+                  folder.folderName,
+                  style: const TextStyle(fontSize: 16),
                   overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${folder.count}项',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
             ),

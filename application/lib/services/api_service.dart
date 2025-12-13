@@ -50,4 +50,18 @@ class ApiService {
     }
     onDeleted?.call();
   }
+
+  static Future<void> setFolderMark(
+      String baseUrl,
+      String folder,
+      String mark
+      ) async {
+    final uri = Uri.parse('$baseUrl/folder_mark').replace(queryParameters: {
+      'folder': folder,
+      'mark': mark,
+    });
+    final res = await getWithTimeout(uri, timeout: _timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('标记文件夹失败');
+  }
 }

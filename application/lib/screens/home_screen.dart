@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/backend_provider.dart';
 import '../services/api_service.dart';
+import '../services/folder_record.dart';
 import '../utils/storage_permission.dart';
 import '../widget/folder_grid.dart';
 import 'settings_screen.dart';
@@ -15,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<String> folders = [];
+  List<Folder> folders = [];
   bool loading = true;
 
   @override
@@ -29,8 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadFolders() async {
     final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
     final data = await ApiService.listRootFolders(url);
+    final List<dynamic> foldersJson = data['folders'];
     setState(() {
-      folders = List<String>.from(data['folders']);
+      folders = foldersJson.map((json) => Folder.fromJson(json)).toList();
       loading = false;
     });
   }
