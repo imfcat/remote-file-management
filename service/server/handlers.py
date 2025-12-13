@@ -5,15 +5,13 @@ from pathlib import Path
 from fastapi import HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 from database.connection import get_db
-from database.models import FileRecord
+from database.models import FolderRecord, FileRecord
 from core.config import config
 
 
-def list_root_folders():
-    dirs = [name for name in os.listdir(config.root_dir)
-            if os.path.isdir(os.path.join(config.root_dir, name))
-            and not name.startswith('.')]
-    return {"folders": dirs}
+def list_root_folders(db: Session = Depends(get_db)):
+    query = db.query(FolderRecord)
+    return {"folders": query.all()}
 
 
 def list_files(
@@ -95,3 +93,16 @@ def file_content(file_path: str = Query(...)):
         raise HTTPException(status_code=404, detail="文件不存在")
 
     return FileResponse(abs_path, filename=abs_path.name)
+
+
+def folder_mark(
+        folder: str,
+        mark: str,
+        db: Session = Depends(get_db)
+):
+    record = db.query(FolderRecord).filter(FolderRecord.folder == folder).update(
+        {FolderRecord.mark: mark}
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="数据库无此文件")
+    return {"message": "标记成功", "mark": str(mark)}

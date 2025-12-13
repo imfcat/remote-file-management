@@ -1,10 +1,10 @@
 import os
 from sqlalchemy.orm import Session
-from database.models import FolderMtime
+from database.models import FolderRecord
 
 def folder_changed(session: Session, root_dir: str, folder: str) -> bool:
     """True: 需要重新扫描"""
-    record = session.query(FolderMtime).filter(FolderMtime.folder == folder).first()
+    record = session.query(FolderRecord).filter(FolderRecord.folder == folder).first()
     folder_path = os.path.join(root_dir, folder)
     if not os.path.isdir(folder_path):
         return False

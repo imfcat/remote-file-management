@@ -13,12 +13,14 @@ class Config(Base):
     value = Column(String, nullable=False, comment="配置值")
 
 
-class FolderMtime(Base):
-    """最后修改时间记录"""
-    __tablename__ = 'folder_mtime'
+class FolderRecord(Base):
+    """根文件夹记录"""
+    __tablename__ = 'folder'
 
     folder = Column(String, primary_key=True, comment="一级文件夹名")
     last_mtime = Column(Float, nullable=False, comment="最后修改时间戳")
+    count = Column(Integer, nullable=True, comment="文件数")
+    mark = Column(String, nullable=True, comment="标记")
 
 
 class FileRecord(Base):

@@ -3,7 +3,7 @@ import os, asyncio
 from pathlib import Path
 from sqlalchemy.orm import Session
 from core.logger import debug, info, warning, error
-from database.models import FileRecord, FolderMtime
+from database.models import FileRecord, FolderRecord
 from utils.needs_update import folder_changed
 from utils.utils import get_md5, get_image_size
 from utils.thumb import make_thumb
@@ -22,10 +22,6 @@ async def scan_directory(root_path: str, session_factory):
 def _scan(root_path: Path, session_factory):
     session = session_factory()
     try:
-        # root = Path(root_path)
-        # dirs = [name for name in os.listdir(root_path)
-        #         if os.path.isdir(os.path.join(root_path, name))
-        #         and not name.startswith('.')]
         # 获取所有一级文件夹
         dirs = [
             p.name for p in root_path.iterdir()
@@ -39,6 +35,7 @@ def _scan(root_path: Path, session_factory):
                 info(f'{folder} 无变动 (SKIP)')
                 continue
             info(f'{folder} 载入 (SCAN)')
+            count_files = 0
 
             # 清除该文件夹旧记录
             session.query(FileRecord).filter(FileRecord.root_folder == folder).delete()
@@ -47,6 +44,7 @@ def _scan(root_path: Path, session_factory):
             for dir_path, _, filenames in os.walk(folder_path):
                 dir_path = Path(dir_path)
                 for file in filenames:
+                    count_files = count_files + 1
                     _process_file(session, root_path, folder, dir_path, file)
                     ext = os.path.splitext(file)[1].lower()
                     # 收集图片和视频文件用于生成缩略图
@@ -57,7 +55,7 @@ def _scan(root_path: Path, session_factory):
             batch_thumbs(all_media_files, root_path)
             # 更新文件夹时间戳
             mtime = os.stat(os.path.join(root_path, folder)).st_mtime
-            session.merge(FolderMtime(folder=folder, last_mtime=mtime))
+            session.merge(FolderRecord(folder=folder, last_mtime=mtime, count=count_files))
 
         session.commit()
     finally:
