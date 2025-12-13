@@ -19,12 +19,10 @@ class FileGrid extends StatefulWidget {
 }
 
 class _FileGridState extends State<FileGrid> {
-  int _crossAxisCount = 8;
   String _sort = 'path';
   String _order = 'asc';
   late Future<List<FileRecord>> _future;
   List<FileRecord>? _files;
-
 
   // 选择模式状态
   bool _isSelecting = false;
@@ -154,12 +152,12 @@ class _FileGridState extends State<FileGrid> {
   }
 
   /// 计算瀑布流Item高度
-  double _calculateItemHeight(BuildContext context, FileRecord f) {
+  double _calculateItemHeight(BuildContext context, FileRecord f, int crossAxisCount) {
     final screenWidth = MediaQuery.of(context).size.width;
     final padding = 8.0 * 2;
     final crossAxisSpacing = 8.0;
-    final availableWidth = screenWidth - padding - (_crossAxisCount - 1) * crossAxisSpacing;
-    final itemWidth = availableWidth / _crossAxisCount;
+    final availableWidth = screenWidth - padding - (crossAxisCount - 1) * crossAxisSpacing;
+    final itemWidth = availableWidth / crossAxisCount;
 
     final double imgWidth = f.width?.toDouble() ?? 100.0;
     final double imgHeight = f.height?.toDouble() ?? 100.0;
@@ -172,20 +170,21 @@ class _FileGridState extends State<FileGrid> {
   }
 
   /// 根据状态获取缩略图URL
-  String _getThumbnailUrl(BuildContext context, FileRecord f) {
-    final targetFile = f.fileType == 'video' ? '${f.file}.jpg' : f.mimeType == 'image/gif' ? '${f.file}.jpg' : f.file;
-    final settings = Provider.of<SettingsProvider>(context);
-    final isSmallThumbnail = settings.isSmallThumbnail;
-    return isSmallThumbnail ? thumbUrl(context, targetFile) : mediumUrl(context, targetFile);
+  String _getThumbnailUrl(BuildContext context, FileRecord f, bool isSmallThumbnail) {
+    final targetFile = f.fileType == 'video'
+        ? '${f.file}.jpg' : f.mimeType == 'image/gif'
+        ? '${f.file}.jpg' : f.file;
+
+    return isSmallThumbnail
+        ? thumbUrl(context, targetFile)
+        : mediumUrl(context, targetFile);
   }
 
-  Widget _itemWidget(BuildContext context, FileRecord f) {
+  Widget _itemWidget(BuildContext context, FileRecord f, bool isSmallThumbnail) {
     Widget content;
-    final settings = Provider.of<SettingsProvider>(context);
-    final isSmallThumbnail = settings.isSmallThumbnail;
 
     if (f.fileType == 'image') {
-      final url = _getThumbnailUrl(context, f);
+      final url = _getThumbnailUrl(context, f, isSmallThumbnail);
       content = Stack(
         children: [
           Positioned.fill(
@@ -215,7 +214,7 @@ class _FileGridState extends State<FileGrid> {
         ],
       );
     } else if (f.fileType == 'video') {
-      final url = _getThumbnailUrl(context, f);
+      final url = _getThumbnailUrl(context, f, isSmallThumbnail);
       content = Stack(
         children: [
           Positioned.fill(
@@ -302,9 +301,10 @@ class _FileGridState extends State<FileGrid> {
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context);
-    final crossAxisCount = settings.fileListColumnCount;
-    final isWaterfallFlow = settings.isWaterfallFlow;
-    final isSmallThumbnail = settings.isSmallThumbnail;
+    final int crossAxisCount = settings.fileListColumnCount;
+    final bool isWaterfallFlow = settings.isWaterfallFlow;
+    final bool isSmallThumbnail = settings.isSmallThumbnail;
+
     return Column(
       children: [
         // 选择模式工具栏
@@ -344,25 +344,28 @@ class _FileGridState extends State<FileGrid> {
                   max: 20,
                   divisions: 19,
                   label: crossAxisCount.toString(),
-                  onChanged: (v) => Provider.of<SettingsProvider>(context, listen: false).setFileListColumnCount(v.round()),
+                  onChanged: (v) => Provider.of<SettingsProvider>(context, listen: false)
+                      .setFileListColumnCount(v.round()),
                 ),
                 // 布局切换按钮
                 IconButton(
                   icon: Icon(
-                    isWaterfallFlow  ? Icons.dashboard : Icons.grid_view,
+                    isWaterfallFlow ? Icons.dashboard : Icons.grid_view,
                     color: Colors.white,
                   ),
-                  tooltip: isWaterfallFlow  ? '切换到网格布局' : '切换到瀑布流布局',
-                  onPressed: () => Provider.of<SettingsProvider>(context, listen: false).toggleWaterfallFlow(!isWaterfallFlow),
+                  tooltip: isWaterfallFlow ? '切换到网格布局' : '切换到瀑布流布局',
+                  onPressed: () => Provider.of<SettingsProvider>(context, listen: false)
+                      .toggleWaterfallFlow(!isWaterfallFlow),
                 ),
                 // 缩略图尺寸切换按钮
                 IconButton(
                   icon: Icon(
-                    isSmallThumbnail  ? Icons.zoom_out : Icons.zoom_in,
+                    isSmallThumbnail ? Icons.zoom_out : Icons.zoom_in,
                     color: Colors.white,
                   ),
-                  tooltip: isSmallThumbnail  ? '切换到大缩略图' : '切换到小缩略图',
-                  onPressed: () => Provider.of<SettingsProvider>(context, listen: false).toggleThumbnailSize(!isSmallThumbnail),
+                  tooltip: isSmallThumbnail ? '切换到大缩略图' : '切换到小缩略图',
+                  onPressed: () => Provider.of<SettingsProvider>(context, listen: false)
+                      .toggleThumbnailSize(!isSmallThumbnail),
                 ),
                 const Spacer(),
                 DropdownButton<String>(
@@ -433,7 +436,7 @@ class _FileGridState extends State<FileGrid> {
                           _selectedFiles.add(f);
                         });
                       },
-                      child: _itemWidget(context, f),
+                      child: _itemWidget(context, f, isSmallThumbnail),
                     );
                   },
                 );
@@ -453,7 +456,7 @@ class _FileGridState extends State<FileGrid> {
                 itemCount: files.length,
                 itemBuilder: (_, i) {
                   final f = files[i];
-                  final itemHeight = _calculateItemHeight(context, f);
+                  final itemHeight = _calculateItemHeight(context, f, crossAxisCount);
 
                   return SizedBox(
                     height: itemHeight,
@@ -477,7 +480,7 @@ class _FileGridState extends State<FileGrid> {
                           _selectedFiles.add(f);
                         });
                       },
-                      child: _itemWidget(context, f),
+                      child: _itemWidget(context, f, isSmallThumbnail),
                     ),
                   );
                 },
