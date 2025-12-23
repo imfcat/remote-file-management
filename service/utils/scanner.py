@@ -7,6 +7,7 @@ from database.models import FileRecord, FolderRecord
 from utils.needs_update import folder_changed
 from utils.utils import get_md5, get_image_size
 from utils.thumb import make_thumb
+from utils.cleaner import clean_missing_resources
 import tqdm
 import concurrent.futures
 
@@ -57,26 +58,11 @@ def _scan(root_path: Path, session_factory):
             mtime = os.stat(os.path.join(root_path, folder)).st_mtime
             session.merge(FolderRecord(folder=folder, last_mtime=mtime, count=count_files))
 
-
-        # 清除数据库中有但实际不存在的文件夹
-        db_folders = [row[0] for row in session.query(FolderRecord.folder).all()]
-        deleted_folders = [f for f in db_folders if f not in dirs]
-        if deleted_folders:
-            warning(f'(CLEAN) {deleted_folders} 已不存在，将清理')
-
-            # 删除关联的FileRecord
-            delete_file_count = session.query(FileRecord).filter(
-                FileRecord.root_folder.in_(deleted_folders)
-            ).delete(synchronize_session=False)
-            warning(f'(CLEAN) 清理关联文件记录数 {delete_file_count}')
-
-            # 删除FolderRecord
-            delete_folder_count = session.query(FolderRecord).filter(
-                FolderRecord.folder.in_(deleted_folders)
-            ).delete(synchronize_session=False)
-            warning(f'(CLEAN) 清理文件夹记录数 {delete_folder_count}')
+        # 清理
+        clean_missing_resources(session, root_path, dirs)
 
         session.commit()
+        info(f'(SUCCESS) 载入完成')
     finally:
         session.close()
 
