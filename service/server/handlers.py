@@ -64,6 +64,17 @@ def delete_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"移动失败: {e}")
 
+    # 查询FileRecord记录，获取root_folder
+    file_record = db.query(FileRecord).filter(FileRecord.file_path == file_path).first()
+    db_root_folder = file_record.root_folder if file_record else None
+    # 更新count
+    if db_root_folder:
+        folder_record = db.query(FolderRecord).filter(FolderRecord.folder == db_root_folder).first()
+        if folder_record:
+            folder_record.count = (folder_record.count or 0) - 1
+            if folder_record.count < 0:
+                folder_record.count = 0
+
     db.query(FileRecord).filter(FileRecord.file_path == file_path).delete()
     db.commit()
     return {"message": "已移入回收站", "recycle_path": str(dst)}
