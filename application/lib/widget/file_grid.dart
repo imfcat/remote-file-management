@@ -189,6 +189,9 @@ class _FileGridState extends State<FileGrid> {
   }
 
   Widget _itemWidget(BuildContext context, FileRecord f, bool isSmallThumbnail) {
+    final isThumbnailCover = Provider.of<SettingsProvider>(context).isThumbnailCover;
+    final BoxFit fitMode = isThumbnailCover ? BoxFit.cover : BoxFit.contain;
+
     Widget content;
 
     if (f.fileType == 'image') {
@@ -198,7 +201,7 @@ class _FileGridState extends State<FileGrid> {
           Positioned.fill(
               child: CachedNetworkImage(
                 imageUrl: url,
-                fit: BoxFit.cover,
+                fit: fitMode,
                 placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
                 errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
                 cacheManager: customCacheManager(),
@@ -228,7 +231,7 @@ class _FileGridState extends State<FileGrid> {
           Positioned.fill(
             child: CachedNetworkImage(
               imageUrl: url,
-              fit: BoxFit.cover,
+              fit: fitMode,
               placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
               errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
               cacheManager: customCacheManager(),
@@ -301,7 +304,7 @@ class _FileGridState extends State<FileGrid> {
     }
 
     return Container(
-      color: Colors.grey[850],
+      color: isThumbnailCover ? Colors.grey[850] : Colors.transparent,
       child: content,
     );
   }
@@ -312,6 +315,7 @@ class _FileGridState extends State<FileGrid> {
     final int crossAxisCount = settings.fileListColumnCount;
     final bool isWaterfallFlow = settings.isWaterfallFlow;
     final bool isSmallThumbnail = settings.isSmallThumbnail;
+    final bool isThumbnailCover = settings.isThumbnailCover;
 
     return Column(
       children: [
@@ -396,6 +400,17 @@ class _FileGridState extends State<FileGrid> {
                   onPressed: () => Provider.of<SettingsProvider>(context, listen: false)
                       .toggleThumbnailSize(!isSmallThumbnail),
                 ),
+                // 缩略图填充模式切换按钮
+                if(!isWaterfallFlow)
+                  IconButton(
+                    icon: Icon(
+                      isThumbnailCover ? Icons.crop : Icons.aspect_ratio,
+                      color: Colors.white,
+                    ),
+                    tooltip: isThumbnailCover ? '取消缩略图填充' : '开启缩略图填充',
+                    onPressed: () => Provider.of<SettingsProvider>(context, listen: false)
+                        .toggleThumbnailCover(!isThumbnailCover),
+                  ),
                 const Spacer(),
                 DropdownButton<String>(
                   value: '$_sort-$_order',
@@ -419,6 +434,12 @@ class _FileGridState extends State<FileGrid> {
                       _load();
                     });
                   },
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  tooltip: '刷新文件列表',
+                  onPressed: reload,
                 ),
               ],
             ),

@@ -47,39 +47,39 @@ class _FolderGridState extends State<FolderGrid> {
           content: SingleChildScrollView(
             child: BlockPicker(
               pickerColor: selectedColor,
-              onColorChanged: (Color color) {
-                selectedColor = color;
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () async {
+              onColorChanged: (Color color) async {
                 Navigator.pop(dialogContext);
                 // 颜色转换
-                String colorMark = '#${selectedColor.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+                String colorMark = '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
 
                 try {
                   final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
                   await ApiService.setFolderMark(url, folder.folderName, colorMark);
 
-                  setState(() {
-                    final folderIndex = widget.folders.indexOf(folder);
-                    if (folderIndex != -1) {
-                      widget.folders[folderIndex] = Folder(
-                        folderName: folder.folderName,
-                        count: folder.count,
-                        mark: colorMark,
-                        lastMtime: null,
-                      );
-                    }
-                  });
+                  // 更新本地UI
+                  if (mounted) {
+                    setState(() {
+                      final folderIndex = widget.folders.indexOf(folder);
+                      if (folderIndex != -1) {
+                        widget.folders[folderIndex] = Folder(
+                          folderName: folder.folderName,
+                          count: folder.count,
+                          mark: colorMark,
+                          lastMtime: null,
+                        );
+                      }
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('颜色设置成功'),
+                        backgroundColor: Colors.green,
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  }
                 } catch (e) {
-                  if (context.mounted) {
+                  if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('设置失败：$e'),
@@ -89,9 +89,9 @@ class _FolderGridState extends State<FolderGrid> {
                   }
                 }
               },
-              child: const Text('确认'),
             ),
-          ],
+          ),
+          actions: const [],
         );
       },
     );

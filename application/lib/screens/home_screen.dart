@@ -28,23 +28,38 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadFolders() async {
-    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
-    final data = await ApiService.listRootFolders(url);
-    final List<dynamic> foldersJson = data['folders'];
-    setState(() {
-      folders = foldersJson.map((json) => Folder.fromJson(json)).toList();
-      loading = false;
-    });
+    try {
+      final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+      final data = await ApiService.listRootFolders(url);
+      final List<dynamic> foldersJson = data['folders'];
+      setState(() {
+        folders = foldersJson.map((json) => Folder.fromJson(json)).toList();
+        loading = false;
+      });
+    } catch (e) {
+      setState(() => loading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载文件夹失败：$e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // 下拉刷新
+  Future<void> _onRefresh() async {
+    setState(() => loading = true);
+    await _loadFolders();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('目录'),
+        title: const Text('目录'),
         backgroundColor: Colors.black87,
         toolbarHeight: 60,
-        leading: Icon(Icons.perm_media),
+        leading: const Icon(Icons.perm_media),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings, size: 24),
@@ -64,9 +79,14 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // 文件网格
           Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : FolderGrid(folders: folders),
+            child: RefreshIndicator(
+              color: Colors.white,
+              backgroundColor: Colors.grey[800],
+              onRefresh: _onRefresh,
+              child: loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : FolderGrid(folders: folders),
+            ),
           ),
         ],
       ),

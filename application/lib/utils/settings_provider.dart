@@ -7,6 +7,7 @@ class _StorageKeys {
   static const String clickAreaSize = 'click_area_size';
   static const String fileListColumnCount = 'file_list_column_count';
   static const String isWaterfallFlow = 'is_waterfall_flow';
+  static const String isThumbnailCover = 'is_thumbnail_cover';
   static const String isSmallThumbnail = 'is_small_thumbnail';
 }
 
@@ -17,6 +18,7 @@ class SettingsProvider extends ChangeNotifier {
   static const int _defaultAreaSize = 50;
   static const int _defaultFileListColumn = 8;
   static const bool _defaultIsWaterfall = false;
+  static const bool _defaultThumbnailCover = true;
   static const bool _defaultIsSmallThumb = true;
 
   // 状态变量
@@ -25,6 +27,7 @@ class SettingsProvider extends ChangeNotifier {
   int _clickAreaSize = _defaultAreaSize;
   int _fileListColumnCount = _defaultFileListColumn;
   bool _isWaterfallFlow = _defaultIsWaterfall;
+  bool _isThumbnailCover = _defaultThumbnailCover;
   bool _isSmallThumbnail = _defaultIsSmallThumb;
 
   //  getter
@@ -33,6 +36,7 @@ class SettingsProvider extends ChangeNotifier {
   int get clickAreaSize => _clickAreaSize;
   int get fileListColumnCount => _fileListColumnCount;
   bool get isWaterfallFlow => _isWaterfallFlow;
+  bool get isThumbnailCover => _isThumbnailCover;
   bool get isSmallThumbnail => _isSmallThumbnail;
 
   /// 初始化
@@ -49,6 +53,7 @@ class SettingsProvider extends ChangeNotifier {
     _clickAreaSize = prefs.getInt(_StorageKeys.clickAreaSize) ?? _defaultAreaSize;
     _fileListColumnCount = prefs.getInt(_StorageKeys.fileListColumnCount) ?? _defaultFileListColumn;
     _isWaterfallFlow = prefs.getBool(_StorageKeys.isWaterfallFlow) ?? _defaultIsWaterfall;
+    _isThumbnailCover = prefs.getBool(_StorageKeys.isThumbnailCover) ?? _defaultThumbnailCover;
     _isSmallThumbnail = prefs.getBool(_StorageKeys.isSmallThumbnail) ?? _defaultIsSmallThumb;
   }
 
@@ -90,6 +95,13 @@ class SettingsProvider extends ChangeNotifier {
   void toggleWaterfallFlow(bool value) {
     _isWaterfallFlow = value;
     _saveBool(_StorageKeys.isWaterfallFlow, value);
+    notifyListeners();
+  }
+
+  /// 切换缩略图填充模式
+  void toggleThumbnailCover(bool value) {
+    _isThumbnailCover = value;
+    _saveBool(_StorageKeys.isThumbnailCover, value);
     notifyListeners();
   }
 
