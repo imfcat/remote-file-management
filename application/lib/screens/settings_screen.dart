@@ -361,10 +361,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: const Text('设置'),
         backgroundColor: Colors.black87,
         toolbarHeight: 60,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.pop(context),
-        ),
       ),
       body: Column(
         children: [

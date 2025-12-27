@@ -11,10 +11,7 @@ class TestPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('测试页面'),
         backgroundColor: Colors.black87,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.pop(context),
-        ),
+        toolbarHeight: 60,
       ),
       body: Center(
         child: Column(

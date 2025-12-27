@@ -6,6 +6,7 @@ import '../utils/settings_provider.dart';
 import '../services/folder_record.dart';
 import '../screens/file_list_screen.dart';
 import '../services/api_service.dart';
+import 'notification.dart';
 
 class FolderGrid extends StatefulWidget {
   final List<Folder> folders;
@@ -69,23 +70,11 @@ class _FolderGridState extends State<FolderGrid> {
                         );
                       }
                     });
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('颜色设置成功'),
-                        backgroundColor: Colors.green,
-                        duration: Duration(seconds: 1),
-                      ),
-                    );
+                    AppNotification.show(message: '颜色设置成功', type: NotificationType.success);
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('设置失败：$e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                    AppNotification.show(message: '颜色设置失败：$e', type: NotificationType.error);
                   }
                 }
               },

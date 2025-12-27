@@ -10,6 +10,7 @@ import '../services/api_service.dart';
 import '../utils/backend_provider.dart';
 import '../utils/custom_cache.dart';
 import '../utils/settings_provider.dart';
+import 'notification.dart';
 
 class PhotoBrowser extends StatefulWidget {
   final List<FileRecord> files;
@@ -168,13 +169,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     setState(() {
       _showOriginal = !_showOriginal;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _showOriginal ? '已切换为原图显示' : '已切换为压缩图显示'
-        ),
-      ),
-    );
+    AppNotification.show(message: _showOriginal ? '已切换为原图显示' : '已切换为压缩图显示');
   }
 
   @override

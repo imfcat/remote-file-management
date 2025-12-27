@@ -10,6 +10,7 @@ import '../utils/custom_cache.dart';
 import '../utils/backend_provider.dart';
 import '../utils/settings_provider.dart';
 import '../screens/image_compare.dart';
+import 'notification.dart';
 
 class FileGrid extends StatefulWidget {
   final String folder;
@@ -45,9 +46,7 @@ class _FileGridState extends State<FileGrid> {
         order: _order,
       ).then((list) => _files = list).catchError((e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("列表加载失败: $e"), backgroundColor: Colors.red, duration: const Duration(seconds: 3))
-          );
+          AppNotification.show(message: '列表加载失败: $e', type: NotificationType.error, duration: Duration(seconds: 3));
         }
         return [];
       });
@@ -108,26 +107,12 @@ class _FileGridState extends State<FileGrid> {
         _exitSelectMode();
       });
 
-      // 显示删除成功提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('成功删除$selectedCount个文件'),
-            backgroundColor: Colors.orangeAccent,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        AppNotification.show(message: '成功删除$selectedCount个文件', type: NotificationType.warning, duration: Duration(seconds: 2));
       }
     } catch (e) {
-      // 显示删除失败提示
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('批量删除失败：$e（选中$selectedCount个文件）'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppNotification.show(message: '批量删除失败：$e（选中$selectedCount个文件）', type: NotificationType.error, duration: Duration(seconds: 3));
       }
     }
   }

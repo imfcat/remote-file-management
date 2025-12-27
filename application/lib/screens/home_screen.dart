@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/folder_record.dart';
 import '../utils/storage_permission.dart';
 import '../widget/folder_grid.dart';
+import '../widget/notification.dart';
 import 'settings_screen.dart';
 
 /// 首页
@@ -39,9 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       setState(() => loading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载文件夹失败：$e'), backgroundColor: Colors.red),
-        );
+        AppNotification.show(message: '加载文件夹失败：$e', type: NotificationType.error);
       }
     }
   }

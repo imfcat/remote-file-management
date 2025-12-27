@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../utils/backend_provider.dart';
 import '../services/api_service.dart';
+import '../widget/notification.dart';
 import 'home_screen.dart';
 
 /// 初始化
@@ -47,12 +48,7 @@ class _InitScreenState extends State<InitScreen> {
       await provider.setBackendUrl('');
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('保存地址已失效，请重新输入'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppNotification.show(message: '保存地址已失效，请重新输入', type: NotificationType.error);
     }
   }
 

@@ -10,6 +10,7 @@ import '../services/file_url.dart';
 import '../services/file_record.dart';
 import '../utils/custom_cache.dart';
 import '../services/api_service.dart';
+import '../widget/notification.dart';
 
 enum CompareMode {
   sideBySide, // 两栏对比
@@ -83,12 +84,7 @@ class _ImageComparePageState extends State<ImageComparePage> {
     } catch (e) {
       if (mounted) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('图片加载失败：$e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppNotification.show(message: '图片加载失败：$e', type: NotificationType.error, duration: Duration(seconds: 2));
         });
       }
     }
@@ -298,13 +294,13 @@ class _ImageComparePageState extends State<ImageComparePage> {
     try {
       await ApiService.deleteFile(widget.backendUrl, widget.image1.filePath, onDeleted: () {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('左侧图片删除成功'), backgroundColor: Colors.green));
+          AppNotification.show(message: '左侧图片删除成功', type: NotificationType.warning, duration: Duration(seconds: 1));
           Navigator.pop(context);
         }
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('左侧图片删除失败：$e'), backgroundColor: Colors.red));
+        AppNotification.show(message: '左侧图片删除失败：$e', type: NotificationType.error, duration: Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isDeletingLeft = false);
@@ -317,13 +313,13 @@ class _ImageComparePageState extends State<ImageComparePage> {
     try {
       await ApiService.deleteFile(widget.backendUrl, widget.image2.filePath, onDeleted: () {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('右侧图片删除成功'), backgroundColor: Colors.green));
+          AppNotification.show(message: '右侧图片删除成功', type: NotificationType.warning, duration: Duration(seconds: 1));
           Navigator.pop(context);
         }
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('右侧图片删除失败：$e'), backgroundColor: Colors.red));
+        AppNotification.show(message: '右侧图片删除失败：$e', type: NotificationType.error, duration: Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isDeletingRight = false);
