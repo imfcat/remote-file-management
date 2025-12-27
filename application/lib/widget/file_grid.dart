@@ -37,25 +37,26 @@ class _FileGridState extends State<FileGrid> {
 
   void _load() {
     final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
-    _future = ApiService.listFiles(
-      baseUrl: url,
-      folder: widget.folder,
-      sort: _sort,
-      order: _order,
-    ).then((list) => _files = list);
+    setState(() {
+      _future = ApiService.listFiles(
+        baseUrl: url,
+        folder: widget.folder,
+        sort: _sort,
+        order: _order,
+      ).then((list) => _files = list).catchError((e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("列表加载失败: $e"), backgroundColor: Colors.red, duration: const Duration(seconds: 3))
+          );
+        }
+        return [];
+      });
+    });
   }
 
   /// 拉取最新列表
   Future<void> reload() async {
-    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
-    final list = await ApiService.listFiles(
-      baseUrl: url,
-      folder: widget.folder,
-      sort: _sort,
-      order: _order,
-    );
-    setState(() => _files = list);
-    // 重新加载时退出选择模式
+    _load();
     _exitSelectMode();
   }
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:nya_image_manage/screens/test_page.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../utils/settings_provider.dart';
+import '../widget/notification.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -19,6 +21,33 @@ enum SettingItemType {
 class _SettingsScreenState extends State<SettingsScreen> {
   String _appVersion = '...';
   final TextEditingController _columnController = TextEditingController();
+
+  int _versionTapCount = 0; // 版本号点击计数
+  final int _unlockCount = 7; // 解锁需要的次数
+  DateTime? _lastTapTime; // 最后一次点击时间
+
+  // 进入测试页面
+  void _handleVersionTap() {
+    final now = DateTime.now();
+    // 点击间隔超过1秒重置计数
+    if (_lastTapTime != null && now.difference(_lastTapTime!).inMilliseconds > 1000) {
+      _versionTapCount = 0;
+    }
+    // 更新计数和最后点击时间
+    setState(() {
+      _versionTapCount++;
+      _lastTapTime = now;
+    });
+
+    if (_versionTapCount == _unlockCount) {
+      _versionTapCount = 0;
+      _lastTapTime = null;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const TestPage()),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -184,9 +213,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // 显示提示消息
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    AppNotification.show(message: message);
   }
 
   // 构建可点击的设置项
@@ -427,12 +454,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // 版本信息
           Padding(
             padding: const EdgeInsets.only(bottom: 20),
-            child: Text(
-              _appVersion,
-              style: const TextStyle(
-                color: Colors.grey,
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
+            child: InkWell(
+              onTap: _handleVersionTap,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              child: Text(
+                _appVersion,
+                style: const TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
             ),
           ),

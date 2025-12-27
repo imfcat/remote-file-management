@@ -5,6 +5,7 @@ import 'utils/settings_provider.dart';
 import 'utils/backend_provider.dart';
 import 'utils/custom_cache.dart';
 import 'screens/init_screen.dart';
+import 'widget/notification.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: AppNotification.navigatorKey,
       title: '图片管理工具',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),

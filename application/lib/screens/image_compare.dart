@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -8,6 +9,7 @@ import 'package:image/image.dart' as img;
 import '../services/file_url.dart';
 import '../services/file_record.dart';
 import '../utils/custom_cache.dart';
+import '../services/api_service.dart';
 
 enum CompareMode {
   sideBySide, // 两栏对比
@@ -39,6 +41,13 @@ class _ImageComparePageState extends State<ImageComparePage> {
   ui.Image? _uiImage2;
   ui.Image? _diffImage;
   bool _isCalculatingDiff = false;
+  bool _showImageInfo = false; // 是否显示图片信息
+  bool _isDeletingLeft = false; // 左侧图片删除中状态
+  bool _isDeletingRight = false; // 右侧图片删除中状态
+  bool _expandLeftInfo = false; // 左侧图片高级信息展开/收起
+  bool _expandRightInfo = false; // 右侧图片高级信息展开/收起
+  Map<String, dynamic> _leftImageDetail = {}; // 左侧图片详细信息
+  Map<String, dynamic> _rightImageDetail = {}; // 右侧图片详细信息
 
   @override
   void initState() {
@@ -58,6 +67,13 @@ class _ImageComparePageState extends State<ImageComparePage> {
       // 计算像素差异
       if (_uiImage1 != null && _uiImage2 != null) {
         await _calculatePixelDiff();
+        // 解析图片详细信息
+        if(mounted) {
+          setState(() {
+            _leftImageDetail = _getImageAllInfo(_uiImage1!, widget.image1);
+            _rightImageDetail = _getImageAllInfo(_uiImage2!, widget.image2);
+          });
+        }
       }
 
       // 首次加载完成后刷新ui
@@ -268,6 +284,146 @@ class _ImageComparePageState extends State<ImageComparePage> {
     );
   }
 
+  // 工具方法
+  String _formatFileSize(int size) {
+    if (size <= 0) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    int digitGroups = (log(size) / log(1024)).floor();
+    return "${(size / pow(1024, digitGroups)).toStringAsFixed(2)} ${units[digitGroups]}";
+  }
+
+  Future<void> _deleteLeftImage() async {
+    if (_isDeletingLeft) return;
+    setState(() => _isDeletingLeft = true);
+    try {
+      await ApiService.deleteFile(widget.backendUrl, widget.image1.filePath, onDeleted: () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('左侧图片删除成功'), backgroundColor: Colors.green));
+          Navigator.pop(context);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('左侧图片删除失败：$e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isDeletingLeft = false);
+    }
+  }
+
+  Future<void> _deleteRightImage() async {
+    if (_isDeletingRight) return;
+    setState(() => _isDeletingRight = true);
+    try {
+      await ApiService.deleteFile(widget.backendUrl, widget.image2.filePath, onDeleted: () {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('右侧图片删除成功'), backgroundColor: Colors.green));
+          Navigator.pop(context);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('右侧图片删除失败：$e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isDeletingRight = false);
+    }
+  }
+
+  /// 解析图片的原始数据返回结构化数据
+  Map<String, dynamic> _getImageAllInfo(ui.Image image, FileRecord fileRecord) {
+    Map<String, dynamic> info = {};
+    try {
+      // 基础信息
+      info['fileName'] = fileRecord.file.split('/').last;
+      info['fileSize'] = fileRecord.fileSize;
+      info['formatSize'] = _formatFileSize(fileRecord.fileSize);
+      info['filePath'] = fileRecord.file;
+
+      // 图片像素信息
+      info['pixelWidth'] = image.width;
+      info['pixelHeight'] = image.height;
+      info['aspectRatio'] = (image.width / image.height).toStringAsFixed(2);
+      info['totalPixels'] = "${(image.width * image.height / 10000).toStringAsFixed(2)} 万像素";
+
+    } catch (e) {
+      info['error'] = '信息解析失败: $e';
+    }
+    return info;
+  }
+
+  /// 信息栏
+  Widget _buildExpandableImageInfo({required Map<String, dynamic> info, required bool isLeft}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      color: Colors.black87,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('文件名：${info['fileName'] ?? '未知'}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    Text('文件大小：${info['formatSize'] ?? '0 B'}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
+                    Text('文件路径：${info['filePath'] ?? '未知'}', style: TextStyle(color: Colors.grey[400], fontSize: 9, overflow: TextOverflow.ellipsis)),
+                  ],
+                ),
+              ),
+              // 展开收起按钮
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                icon: Icon(
+                  isLeft ? (_expandLeftInfo ? Icons.expand_less : Icons.expand_more) : (_expandRightInfo ? Icons.expand_less : Icons.expand_more),
+                  color: Colors.blueAccent,
+                  size: 18,
+                ),
+                onPressed: () {
+                  setState(() {
+                    if(isLeft) _expandLeftInfo = !_expandLeftInfo;
+                    else _expandRightInfo = !_expandRightInfo;
+                  });
+                },
+              ),
+            ],
+          ),
+
+          // 高级信息
+          if( (isLeft && _expandLeftInfo) || (!isLeft && _expandRightInfo) )
+            Container(
+              margin: const EdgeInsets.only(top: 6, left: 2),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                  color: Colors.grey[900]!.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3), width: 1)
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('高级信息', style: TextStyle(color: Colors.blueAccent, fontSize: 11, fontWeight: FontWeight.w500)),
+                  Divider(height: 8, color: Colors.grey[700]),
+                  // 像素信息
+                  Text('原始像素：${info['pixelWidth']} × ${info['pixelHeight']}', style: const TextStyle(color: Colors.white, fontSize: 10)),
+                  Text('宽高比例：${info['aspectRatio']}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
+                  Text('总像素量：${info['totalPixels']}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
+                  const SizedBox(height: 4),
+                  // 色彩信息
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -360,6 +516,14 @@ class _ImageComparePageState extends State<ImageComparePage> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blueAccent),
                 ),
               ),
+            Padding(
+              padding: const EdgeInsets.only(left:12),
+              child: IconButton(
+                icon: Icon(_showImageInfo ? Icons.info : Icons.info_outline, color: _showImageInfo ? Colors.blueAccent : Colors.white, size:20),
+                tooltip: _showImageInfo ? '隐藏图片信息' : '显示图片信息',
+                onPressed: ()=>setState(()=>_showImageInfo=!_showImageInfo),
+              ),
+            ),
           ],
         ),
       );
@@ -412,6 +576,45 @@ class _ImageComparePageState extends State<ImageComparePage> {
                   ),
                   size: Size.infinite,
                 ),
+                // 左侧删除按钮
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: _isDeletingLeft
+                    ? const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                    )
+                    : InkWell(
+                      onTap: _deleteLeftImage,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(16)
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 20
+                        )
+                      )
+                    ),
+                ),
+                // 左侧可展开的图片信息栏
+                if(_showImageInfo)
+                  Positioned(
+                    left:0,
+                    right:0,
+                    bottom:0,
+                    child: _buildExpandableImageInfo(
+                      info: _leftImageDetail,
+                      isLeft: true
+                    )
+                  ),
               ],
             ),
           ),
@@ -434,6 +637,40 @@ class _ImageComparePageState extends State<ImageComparePage> {
                   ),
                   size: Size.infinite,
                 ),
+                // 右侧删除按钮
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: _isDeletingRight
+                    ? const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                    )
+                    : InkWell(
+                      onTap: _deleteRightImage,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(16)
+                          ),
+                          child: const Icon(Icons.delete_outline, color: Colors.white, size:20)
+                      )
+                    ),
+                ),
+                // 右侧可展开的图片信息栏
+                if(_showImageInfo)
+                  Positioned(
+                    left:0,
+                    right:0,
+                    bottom:0,
+                    child: _buildExpandableImageInfo(
+                      info: _rightImageDetail, isLeft: false
+                    )
+                  ),
               ],
             ),
           ),
