@@ -29,6 +29,7 @@ class _FileGridState extends State<FileGrid> {
   // 选择模式状态
   bool _isSelecting = false;
   final Set<FileRecord> _selectedFiles = {};
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -87,7 +88,8 @@ class _FileGridState extends State<FileGrid> {
 
   /// 批量删除选中文件
   Future<void> _deleteSelectedFiles() async {
-    if (_selectedFiles.isEmpty) return;
+    if (_selectedFiles.isEmpty || _isDeleting) return;
+
     final int selectedCount = _selectedFiles.length;
     final confirm = await _showConfirmDialog(
       '批量删除确认',
@@ -96,9 +98,15 @@ class _FileGridState extends State<FileGrid> {
 
     if (!confirm) return;
 
+    setState(() {
+      _isDeleting = true;
+    });
+
     try {
       final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
-      for (var file in _selectedFiles) {
+
+      final filesToDelete = _selectedFiles.toList();
+      for (var file in filesToDelete) {
         await ApiService.deleteFile(url, file.filePath);
       }
 
@@ -113,6 +121,13 @@ class _FileGridState extends State<FileGrid> {
     } catch (e) {
       if (mounted) {
         AppNotification.show(message: '批量删除失败：$e（选中$selectedCount个文件）', type: NotificationType.error, duration: Duration(seconds: 3));
+      }
+    } finally {
+      // 解除锁定
+      if (mounted) {
+        setState(() {
+          _isDeleting = false;
+        });
       }
     }
   }
@@ -319,7 +334,7 @@ class _FileGridState extends State<FileGrid> {
                 // 图片对比按钮
                 if (_isTwoImagesSelected())
                   TextButton(
-                    onPressed: () {
+                    onPressed: _isDeleting ? null : () {
                       final List<FileRecord> selectedImages = _selectedFiles.toList();
                       Navigator.push(
                         context,
@@ -338,11 +353,11 @@ class _FileGridState extends State<FileGrid> {
                     ),
                   ),
                 TextButton(
-                  onPressed: _exitSelectMode,
+                  onPressed: _isDeleting ? null : _exitSelectMode,
                   child: const Text('取消', style: TextStyle(color: Colors.white)),
                 ),
                 TextButton(
-                  onPressed: _deleteSelectedFiles,
+                  onPressed: _isDeleting ? null : _deleteSelectedFiles,
                   child: const Text('删除所选', style: TextStyle(color: Colors.red)),
                 ),
               ],
@@ -454,6 +469,7 @@ class _FileGridState extends State<FileGrid> {
                     final f = files[i];
                     return GestureDetector(
                       onTap: () async {
+                        if (_isDeleting) return;
                         if (_isSelecting) {
                           _toggleFileSelection(f);
                         } else {
@@ -467,6 +483,7 @@ class _FileGridState extends State<FileGrid> {
                         }
                       },
                       onLongPress: () {
+                        if (_isDeleting) return;
                         setState(() {
                           _isSelecting = true;
                           _selectedFiles.add(f);
@@ -498,6 +515,7 @@ class _FileGridState extends State<FileGrid> {
                     height: itemHeight,
                     child: GestureDetector(
                       onTap: () async {
+                        if (_isDeleting) return;
                         if (_isSelecting) {
                           _toggleFileSelection(f);
                         } else {
@@ -511,6 +529,7 @@ class _FileGridState extends State<FileGrid> {
                         }
                       },
                       onLongPress: () {
+                        if (_isDeleting) return;
                         setState(() {
                           _isSelecting = true;
                           _selectedFiles.add(f);
