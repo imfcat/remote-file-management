@@ -366,7 +366,13 @@ class _ImageComparePageState extends State<ImageComparePage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('文件名：${info['fileName'] ?? '未知'}', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                    Text('文件大小：${info['formatSize'] ?? '0 B'}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
+                    Row(
+                      children: [
+                        Text('文件大小：${info['formatSize'] ?? '0 B'}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
+                        const SizedBox(width: 16),
+                        Text('像素尺寸：${info['pixelWidth']} × ${info['pixelHeight']}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
+                      ]
+                    ),
                     Text('文件路径：${info['filePath'] ?? '未知'}', style: TextStyle(color: Colors.grey[400], fontSize: 9, overflow: TextOverflow.ellipsis)),
                   ],
                 ),
@@ -407,7 +413,6 @@ class _ImageComparePageState extends State<ImageComparePage> {
                   const Text('高级信息', style: TextStyle(color: Colors.blueAccent, fontSize: 11, fontWeight: FontWeight.w500)),
                   Divider(height: 8, color: Colors.grey[700]),
                   // 像素信息
-                  Text('原始像素：${info['pixelWidth']} × ${info['pixelHeight']}', style: const TextStyle(color: Colors.white, fontSize: 10)),
                   Text('宽高比例：${info['aspectRatio']}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
                   Text('总像素量：${info['totalPixels']}', style: TextStyle(color: Colors.grey[300], fontSize: 10)),
                   const SizedBox(height: 4),
