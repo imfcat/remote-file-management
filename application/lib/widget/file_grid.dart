@@ -31,6 +31,12 @@ class _FileGridState extends State<FileGrid> {
   final Set<FileRecord> _selectedFiles = {};
   bool _isDeleting = false;
 
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '${bytes}B';
+    if (bytes < 1048576) return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    return '${(bytes / 1048576).toStringAsFixed(1)}MB';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -101,6 +107,14 @@ class _FileGridState extends State<FileGrid> {
     setState(() {
       _isDeleting = true;
     });
+
+    if (mounted) {
+      AppNotification.show(
+        message: '正在删除 $selectedCount 个文件...',
+        type: NotificationType.info,
+        duration: const Duration(seconds: 10),
+      );
+    }
 
     try {
       final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
@@ -189,7 +203,70 @@ class _FileGridState extends State<FileGrid> {
         : mediumUrl(context, targetFile);
   }
 
+  /// 文件信息叠加层
+  Widget? _buildInfoOverlay(FileRecord f, SettingsProvider settings) {
+    if (!settings.showInfoTitle && !settings.showInfoSize && !settings.showInfoResolution) {
+      return null;
+    }
+
+    List<Widget> infoLines = [];
+
+    // 标题显示
+    if (settings.showInfoTitle) {
+      infoLines.add(Text(
+        f.file ?? '未知名称',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.2),
+      ));
+    }
+
+    // 尺寸显示
+    if (settings.showInfoResolution && f.width != null && f.height != null && f.width! > 0) {
+      infoLines.add(Text(
+        '${f.width} × ${f.height}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.2),
+      ));
+    }
+
+    // 大小显示
+    if (settings.showInfoSize) {
+      infoLines.add(Text(
+        _formatBytes(f.fileSize),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.2),
+      ));
+    }
+
+    if (infoLines.isEmpty) return null;
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        padding: const EdgeInsets.only(left: 6, right: 6, top: 12, bottom: 4),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [Colors.black87, Colors.transparent],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: infoLines,
+        ),
+      ),
+    );
+  }
+
   Widget _itemWidget(BuildContext context, FileRecord f, bool isSmallThumbnail) {
+    final settings = Provider.of<SettingsProvider>(context);
     final isThumbnailCover = Provider.of<SettingsProvider>(context).isThumbnailCover;
     final BoxFit fitMode = isThumbnailCover ? BoxFit.cover : BoxFit.contain;
 
@@ -210,7 +287,9 @@ class _FileGridState extends State<FileGrid> {
                 key: ValueKey('${url}_${isSmallThumbnail}'),
               )
           ),
-          if (f.mimeType == 'image/gif')
+          if (_buildInfoOverlay(f, settings) != null)
+            _buildInfoOverlay(f, settings)!,
+          if (settings.showInfoIcon && f.mimeType == 'image/gif')
             Positioned(
               right: 4,
               bottom: 4,
@@ -220,7 +299,7 @@ class _FileGridState extends State<FileGrid> {
                   color: Colors.black54,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Icon(Icons.gif, color: Colors.white, size: 24),
+                child: const Icon(Icons.gif, color: Colors.white, size: 20),
               ),
             ),
         ],
@@ -239,18 +318,21 @@ class _FileGridState extends State<FileGrid> {
               key: ValueKey('${url}_${isSmallThumbnail}'),
             ),
           ),
-          Positioned(
-            right: 4,
-            bottom: 4,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(4),
+          if (_buildInfoOverlay(f, settings) != null)
+            _buildInfoOverlay(f, settings)!,
+          if (settings.showInfoIcon)
+            Positioned(
+              right: 4,
+              bottom: 4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Icon(Icons.videocam, color: Colors.white, size: 18),
               ),
-              child: const Icon(Icons.videocam, color: Colors.white, size: 20),
             ),
-          ),
         ],
       );
     } else {
@@ -258,9 +340,16 @@ class _FileGridState extends State<FileGrid> {
       final iconMap = {
         'text': Icons.description,
       };
-      content = Center(
-        child: Icon(iconMap[f.fileType] ?? Icons.insert_drive_file,
-            size: 48, color: Colors.white70),
+      content = Stack(
+        fit: StackFit.expand,
+        children: [
+          Center(
+            child: Icon(iconMap[f.fileType] ?? Icons.insert_drive_file,
+                size: 48, color: Colors.white70),
+          ),
+          if (_buildInfoOverlay(f, settings) != null)
+            _buildInfoOverlay(f, settings)!,
+        ],
       );
     }
 
@@ -368,18 +457,37 @@ class _FileGridState extends State<FileGrid> {
           Container(
             height: 60,
             color: Colors.grey[900],
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
-                const Text('列数：', style: TextStyle(color: Colors.white)),
-                Slider(
-                  value: crossAxisCount.toDouble(),
-                  min: 1,
-                  max: 20,
-                  divisions: 19,
-                  label: crossAxisCount.toString(),
-                  onChanged: (v) => Provider.of<SettingsProvider>(context, listen: false)
-                      .setFileListColumnCount(v.round()),
+                // 列数显示
+                IconButton(
+                  icon: const Icon(Icons.remove_circle_outline),
+                  color: Colors.white,
+                  disabledColor: Colors.grey[700],
+                  tooltip: '减少列数',
+                  onPressed: crossAxisCount > 1
+                      ? () => Provider.of<SettingsProvider>(context, listen: false)
+                      .setFileListColumnCount(crossAxisCount - 1)
+                      : null,
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 20),
+                  alignment: Alignment.center,
+                  child: Text(
+                      '$crossAxisCount',
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline),
+                  color: Colors.white,
+                  disabledColor: Colors.grey[700],
+                  tooltip: '增加列数',
+                  onPressed: crossAxisCount < 20
+                      ? () => Provider.of<SettingsProvider>(context, listen: false)
+                      .setFileListColumnCount(crossAxisCount + 1)
+                      : null,
                 ),
                 // 布局切换按钮
                 IconButton(
@@ -412,6 +520,45 @@ class _FileGridState extends State<FileGrid> {
                     onPressed: () => Provider.of<SettingsProvider>(context, listen: false)
                         .toggleThumbnailCover(!isThumbnailCover),
                   ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.info_outline, color: Colors.white),
+                  tooltip: '信息显示设置',
+                  color: Colors.grey[850],
+                  position: PopupMenuPosition.under,
+                  itemBuilder: (context) {
+                    final settingsRead = Provider.of<SettingsProvider>(context, listen: false);
+                    return [
+                      CheckedPopupMenuItem(
+                        checked: settingsRead.showInfoTitle,
+                        value: 'title',
+                        child: const Text('标题显示', style: TextStyle(color: Colors.white)),
+                      ),
+                      CheckedPopupMenuItem(
+                        checked: settingsRead.showInfoSize,
+                        value: 'size',
+                        child: const Text('大小显示', style: TextStyle(color: Colors.white)),
+                      ),
+                      CheckedPopupMenuItem(
+                        checked: settingsRead.showInfoResolution,
+                        value: 'resolution',
+                        child: const Text('尺寸显示', style: TextStyle(color: Colors.white)),
+                      ),
+                      CheckedPopupMenuItem(
+                        checked: settingsRead.showInfoIcon,
+                        value: 'icon',
+                        child: const Text('角标显示', style: TextStyle(color: Colors.white)),
+                      ),
+                      const PopupMenuDivider(),
+                    ];
+                  },
+                  onSelected: (val) {
+                    final settingsFunc = Provider.of<SettingsProvider>(context, listen: false);
+                    if (val == 'title') settingsFunc.toggleShowInfoTitle(!settingsFunc.showInfoTitle);
+                    if (val == 'size') settingsFunc.toggleShowInfoSize(!settingsFunc.showInfoSize);
+                    if (val == 'resolution') settingsFunc.toggleShowInfoResolution(!settingsFunc.showInfoResolution);
+                    if (val == 'icon') settingsFunc.toggleShowInfoIcon(!settingsFunc.showInfoIcon);
+                  },
+                ),
                 const Spacer(),
                 DropdownButton<String>(
                   value: '$_sort-$_order',
@@ -473,13 +620,16 @@ class _FileGridState extends State<FileGrid> {
                         if (_isSelecting) {
                           _toggleFileSelection(f);
                         } else {
+                          final int originalLength = files.length;
                           final deleted = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (_) => PhotoBrowser(files: files, initialIndex: i),
                             ),
                           );
-                          if (deleted == true) reload();
+                          if (deleted == true || files.length != originalLength) {
+                            reload();
+                          }
                         }
                       },
                       onLongPress: () {
@@ -519,13 +669,16 @@ class _FileGridState extends State<FileGrid> {
                         if (_isSelecting) {
                           _toggleFileSelection(f);
                         } else {
+                          final int originalLength = files.length;
                           final deleted = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (_) => PhotoBrowser(files: files, initialIndex: i),
                             ),
                           );
-                          if (deleted == true) reload();
+                          if (deleted == true || files.length != originalLength) {
+                            reload();
+                          }
                         }
                       },
                       onLongPress: () {

@@ -9,6 +9,11 @@ class _StorageKeys {
   static const String isWaterfallFlow = 'is_waterfall_flow';
   static const String isThumbnailCover = 'is_thumbnail_cover';
   static const String isSmallThumbnail = 'is_small_thumbnail';
+
+  static const String showInfoTitle = 'show_info_title';
+  static const String showInfoSize = 'show_info_size';
+  static const String showInfoResolution = 'show_info_resolution';
+  static const String showInfoIcon = 'show_info_icon';
 }
 
 class SettingsProvider extends ChangeNotifier {
@@ -21,6 +26,11 @@ class SettingsProvider extends ChangeNotifier {
   static const bool _defaultThumbnailCover = true;
   static const bool _defaultIsSmallThumb = true;
 
+  static const bool _defaultShowTitle = false;
+  static const bool _defaultShowSize = false;
+  static const bool _defaultShowResolution = false;
+  static const bool _defaultShowIcon = false;
+
   // 状态变量
   int _gridColumnCount = _defaultGridColumn;
   bool _clickToggleEnabled = _defaultClickEnabled;
@@ -30,6 +40,11 @@ class SettingsProvider extends ChangeNotifier {
   bool _isThumbnailCover = _defaultThumbnailCover;
   bool _isSmallThumbnail = _defaultIsSmallThumb;
 
+  bool _showInfoTitle = _defaultShowTitle;
+  bool _showInfoSize = _defaultShowSize;
+  bool _showInfoResolution = _defaultShowResolution;
+  bool _showInfoIcon = _defaultShowIcon;
+
   //  getter
   int get gridColumnCount => _gridColumnCount;
   bool get clickToggleEnabled => _clickToggleEnabled;
@@ -38,6 +53,11 @@ class SettingsProvider extends ChangeNotifier {
   bool get isWaterfallFlow => _isWaterfallFlow;
   bool get isThumbnailCover => _isThumbnailCover;
   bool get isSmallThumbnail => _isSmallThumbnail;
+
+  bool get showInfoTitle => _showInfoTitle;
+  bool get showInfoSize => _showInfoSize;
+  bool get showInfoResolution => _showInfoResolution;
+  bool get showInfoIcon => _showInfoIcon;
 
   /// 初始化
   Future<void> init() async {
@@ -55,6 +75,11 @@ class SettingsProvider extends ChangeNotifier {
     _isWaterfallFlow = prefs.getBool(_StorageKeys.isWaterfallFlow) ?? _defaultIsWaterfall;
     _isThumbnailCover = prefs.getBool(_StorageKeys.isThumbnailCover) ?? _defaultThumbnailCover;
     _isSmallThumbnail = prefs.getBool(_StorageKeys.isSmallThumbnail) ?? _defaultIsSmallThumb;
+
+    _showInfoTitle = prefs.getBool(_StorageKeys.showInfoTitle) ?? _defaultShowTitle;
+    _showInfoSize = prefs.getBool(_StorageKeys.showInfoSize) ?? _defaultShowSize;
+    _showInfoResolution = prefs.getBool(_StorageKeys.showInfoResolution) ?? _defaultShowResolution;
+    _showInfoIcon = prefs.getBool(_StorageKeys.showInfoIcon) ?? _defaultShowIcon;
   }
 
   /// 设置网格列数
@@ -109,6 +134,34 @@ class SettingsProvider extends ChangeNotifier {
   void toggleThumbnailSize(bool value) {
     _isSmallThumbnail = value;
     _saveBool(_StorageKeys.isSmallThumbnail, value);
+    notifyListeners();
+  }
+
+  /// 切换显示文件标题
+  void toggleShowInfoTitle(bool value) {
+    _showInfoTitle = value;
+    _saveBool(_StorageKeys.showInfoTitle, value);
+    notifyListeners();
+  }
+
+  /// 切换显示文件大小
+  void toggleShowInfoSize(bool value) {
+    _showInfoSize = value;
+    _saveBool(_StorageKeys.showInfoSize, value);
+    notifyListeners();
+  }
+
+  /// 切换显示文件尺寸
+  void toggleShowInfoResolution(bool value) {
+    _showInfoResolution = value;
+    _saveBool(_StorageKeys.showInfoResolution, value);
+    notifyListeners();
+  }
+
+  /// 切换显示文件图标
+  void toggleShowInfoIcon(bool value) {
+    _showInfoIcon = value;
+    _saveBool(_StorageKeys.showInfoIcon, value);
     notifyListeners();
   }
 
