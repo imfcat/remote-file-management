@@ -264,7 +264,10 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                 // 视频
                 final url = fileContentUrl(context, f.file);
                 return PhotoViewGalleryPageOptions.customChild(
-                  child: VideoPreview(videoUrl: url),
+                  child: VideoPreview(
+                    videoUrl: url,
+                    uiVisible: _uiVisible,
+                  ),
                   minScale: PhotoViewComputedScale.contained,
                   maxScale: PhotoViewComputedScale.contained,
                 );
