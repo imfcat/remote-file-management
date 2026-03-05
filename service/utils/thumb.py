@@ -5,6 +5,11 @@ from pathlib import Path
 import os
 from core.logger import debug, info, warning, error
 
+if os.name == 'nt':
+    CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW
+else:
+    CREATE_NO_WINDOW = 0
+
 IMAGE_EXT = {'.jpg', '.jpeg', '.jpe', '.png', '.bmp', '.tiff'}
 GIF_EXT = {'.gif'}
 VIDEO_EXT = {'.mp4', '.avi', '.mov', '.mkv'}
@@ -41,7 +46,8 @@ def get_video_dimensions(video_path: str) -> tuple[int, int]:
             ],
             check=True,
             capture_output=True,
-            text=True
+            text=True,
+            creationflags=CREATE_NO_WINDOW
         )
         width, height = map(int, result.stdout.strip().split(','))
         return (width, height)
@@ -83,7 +89,8 @@ def extract_video_frame(video_path: str, output_frame_path: str) -> bool:
                 output_frame_path
             ],
             capture_output=True,
-            text=True
+            text=True,
+            creationflags=CREATE_NO_WINDOW
         )
 
         if result.returncode != 0:
