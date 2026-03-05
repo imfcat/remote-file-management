@@ -3,10 +3,18 @@ import tkinter as tk
 from threading import Lock
 
 LEVEL_COLOR = {
-    'DEBUG': 'white',
-    'INFO': 'white',
-    'WARNING': 'yellow',
-    'ERROR': 'red'
+    'DEBUG': '#AAAAAA',
+    'INFO': '#FFFFFF',
+    'WARNING': '#FFD700',
+    'ERROR': '#FF6347'
+}
+
+TAG_COLOR = {
+    '(SCAN)': '#00FFFF',
+    '(THUMB)': '#98FB98',
+    '(CLEAN)': '#FFA500',
+    '(SUCCESS)': '#32CD32',
+    '(SKIP)': '#808080',
 }
 
 LEVEL_MAP = {
@@ -75,6 +83,11 @@ class GuiLogger(logging.Handler):
             datefmt='%H:%M:%S'
         ))
 
+        self.text_widget.config(state=tk.NORMAL)
+        for color_name in set(LEVEL_COLOR.values()).union(TAG_COLOR.values()):
+            self.text_widget.tag_config(color_name, foreground=color_name)
+        self.text_widget.config(state=tk.DISABLED)
+
     def emit(self, record):
         """输出日志到GUI文本框"""
         try:
@@ -85,7 +98,14 @@ class GuiLogger(logging.Handler):
             # 只输出大于当前级别的日志
             if record.levelno >= current_level_val:
                 msg = self.format(record)
-                color = LEVEL_COLOR.get(record.levelname, 'white')
+
+                color = LEVEL_COLOR.get(record.levelname, '#FFFFFF')
+
+                for tag, tag_color in TAG_COLOR.items():
+                    if tag in record.getMessage():
+                        color = tag_color
+                        break
+
                 self.text_widget.after(0, self._write_log, msg, color)
         except Exception:
             self.handleError(record)
@@ -93,7 +113,14 @@ class GuiLogger(logging.Handler):
     def _write_log(self, msg: str, color: str):
         """实际写入日志到文本框"""
         self.text_widget.config(state=tk.NORMAL)
-        self.text_widget.tag_config(color, foreground=color)
+
+        # 如果当前消息是进度更新
+        progress_keyword = "(THUMB) 缩略图生成进度"
+        if progress_keyword in msg:
+            last_line_content = self.text_widget.get("end-2c linestart", "end-1c")
+            if progress_keyword in last_line_content:
+                self.text_widget.delete("end-2c linestart", "end-1c")
+
         self.text_widget.insert(tk.END, msg + '\n', color)
         self.text_widget.config(state=tk.DISABLED)
         self.text_widget.see(tk.END)

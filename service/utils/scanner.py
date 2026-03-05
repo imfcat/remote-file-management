@@ -33,9 +33,9 @@ def _scan(root_path: Path, session_factory):
         for folder in dirs:
             folder_path = root_path / folder
             if not folder_changed(session, str(root_path), folder):
-                info(f'(SKIP) {folder} 无变动')
+                info(f'(SKIP) 目录 [{folder}] 无变动')
                 continue
-            info(f'(SCAN) {folder} 载入')
+            info(f'(SCAN) 扫描目录 [{folder}]')
             count_files = 0
 
             # 清除该文件夹旧记录
@@ -52,6 +52,7 @@ def _scan(root_path: Path, session_factory):
                     if ext in IMAGE_EXT or ext in VIDEO_EXT:
                         all_media_files.append(str(dir_path / file))
 
+            info(f'(SCAN) 目录 [{folder}] 扫描到 {count_files} 个文件')
             # 批量生成两种尺寸的缩略图
             batch_thumbs(all_media_files, root_path)
             # 更新文件夹时间戳
@@ -122,32 +123,35 @@ def batch_thumbs(file_list, root_dir, workers: int = 8):
 
     # 检查目录是否可写
     if not os.access(str(cache_dir), os.W_OK):
-        error(f".cache目录不可写：{cache_dir}，停止生成缩略图")
+        error(f"(THUMB) .cache目录不可写：{cache_dir}，停止生成缩略图")
         return
 
     (cache_dir / 'thumb').mkdir(parents=True, exist_ok=True)
     (cache_dir / 'medium').mkdir(parents=True, exist_ok=True)
 
+    info(f"(THUMB) 开始缩略图任务 {len(file_list)}")
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = []
-        for file_path in tqdm.tqdm(file_list, desc="生成缩略图"):
-            # 提交小缩略图任务
-            future_thumb = pool.submit(
-                make_thumb, file_path, root_dir, 300, 'thumb'
-            )
-            futures.append((file_path, '小', future_thumb))
+        future_to_info = {}
+        for file_path in file_list:
+            f1 = pool.submit(make_thumb, file_path, root_dir, 300, 'thumb')
+            f2 = pool.submit(make_thumb, file_path, root_dir, 2000, 'medium')
+            future_to_info[f1] = (file_path, '小')
+            future_to_info[f2] = (file_path, '中等')
 
-            # 提交中等压缩图任务
-            future_medium = pool.submit(
-                make_thumb, file_path, root_dir, 2000, 'medium'
-            )
-            futures.append((file_path, '中等', future_medium))
+        total_tasks = len(future_to_info)
+        completed = 0
+        report_step = max(1, total_tasks // 10)
 
-        # 处理任务结果
-        for file_path, size_type, future in futures:
+        for future in concurrent.futures.as_completed(future_to_info):
+            file_path, size_type = future_to_info[future]
+            completed += 1
             try:
-                # thumb_path = future.result()
-                # logger.info(f"{size_type}缩略图生成成功：{thumb_path}")
                 future.result()
+                debug(f"(THUMB) 成功：{size_type}图 [{Path(file_path).name}]")
             except Exception as e:
-                error(f"[Thumb] {size_type}缩略图生成失败：{file_path} → {e}")
+                error(f"(THUMB) 失败：{size_type}图 [{Path(file_path).name}] -> {e}")
+
+            if completed % report_step == 0 or completed == total_tasks:
+                percentage = (completed / total_tasks) * 100
+                info(f"(THUMB) 缩略图生成进度: {completed}/{total_tasks} ({percentage:.1f}%)")

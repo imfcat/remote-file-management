@@ -3,10 +3,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 import os
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("thumb_generator")
+from core.logger import debug, info, warning, error
 
 IMAGE_EXT = {'.jpg', '.jpeg', '.jpe', '.png', '.bmp', '.tiff'}
 GIF_EXT = {'.gif'}
@@ -23,7 +20,7 @@ def get_image_dimensions(image_path: str) -> tuple[int, int]:
         image = pyvips.Image.new_from_file(image_path, access='sequential')
         return (image.width, image.height)
     except Exception as e:
-        logger.error(f"获取图像尺寸失败: {str(e)}，路径: {image_path}")
+        error(f"获取图像尺寸失败: {str(e)}，路径: {image_path}")
         raise
 
 
@@ -49,13 +46,13 @@ def get_video_dimensions(video_path: str) -> tuple[int, int]:
         width, height = map(int, result.stdout.strip().split(','))
         return (width, height)
     except subprocess.CalledProcessError as e:
-        logger.error(f"ffprobe命令执行失败: {e.stderr}，视频路径: {video_path}")
+        error(f"ffprobe命令执行失败: {e.stderr}，视频路径: {video_path}")
         raise
     except FileNotFoundError:
-        logger.error("未找到ffprobe，请确保ffmpeg已安装并添加到系统PATH中")
+        error("未找到ffprobe，请确保ffmpeg已安装并添加到系统PATH中")
         raise
     except Exception as e:
-        logger.error(f"获取视频尺寸失败: {str(e)}，视频路径: {video_path}")
+        error(f"获取视频尺寸失败: {str(e)}，视频路径: {video_path}")
         raise
 
 
@@ -66,7 +63,7 @@ def extract_video_frame(video_path: str, output_frame_path: str) -> bool:
         output_frame_path = str(Path(output_frame_path).resolve())
 
         if not os.path.exists(video_path):
-            logger.error(f"视频文件不存在: {video_path}")
+            error(f"视频文件不存在: {video_path}")
             return False
 
         # 输出目录验证
@@ -90,17 +87,17 @@ def extract_video_frame(video_path: str, output_frame_path: str) -> bool:
         )
 
         if result.returncode != 0:
-            logger.error(f"ffmpeg错误输出: {result.stderr}")
+            error(f"ffmpeg错误输出: {result.stderr}")
             return False
 
         if not os.path.exists(output_frame_path) or os.path.getsize(output_frame_path) == 0:
-            logger.error(
+            error(
                 f"ffmpeg未生成有效文件: {output_frame_path} (大小: {os.path.getsize(output_frame_path) if os.path.exists(output_frame_path) else 0})")
             return False
 
         return True
     except Exception as e:
-        logger.error(f"提取视频帧时发生错误: {str(e)}，视频路径: {video_path}")
+        error(f"提取视频帧时发生错误: {str(e)}，视频路径: {video_path}")
         return False
 
 
@@ -155,7 +152,7 @@ def make_thumb(originalPath: str, rootDir: str, size: int, subdir: str) -> str:
             original_width, original_height = get_image_dimensions(originalPath)
         original_max_dim = max(original_width, original_height)
     except Exception as e:
-        logger.warning(f"无法获取原始文件尺寸，将使用默认缩放行为: {str(e)}")
+        warning(f"无法获取原始文件尺寸，将使用默认缩放行为: {str(e)}")
         original_max_dim = size + 1  # 强制使用缩放行为
 
     # 缩放
@@ -224,7 +221,7 @@ def make_thumb(originalPath: str, rootDir: str, size: int, subdir: str) -> str:
             image.write_to_file(str(thumb_path), **write_args)
 
     except Exception as e:
-        logger.error(f"处理文件时出错: {str(e)}", exc_info=True)
+        error(f"处理文件时出错: {str(e)}", exc_info=True)
         # 出错时尝试删除不完整的缩略图
         if os.path.exists(str(thumb_path)):
             os.remove(str(thumb_path))
@@ -235,6 +232,6 @@ def make_thumb(originalPath: str, rootDir: str, size: int, subdir: str) -> str:
             try:
                 os.remove(temp_frame_path)
             except Exception as e:
-                logger.error(f"删除临时文件失败: {str(e)}, 文件路径: {temp_frame_path}")
+                error(f"删除临时文件失败: {str(e)}, 文件路径: {temp_frame_path}")
 
     return str(thumb_path)
