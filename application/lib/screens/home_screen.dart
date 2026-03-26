@@ -6,6 +6,7 @@ import '../services/folder_record.dart';
 import '../utils/storage_permission.dart';
 import '../widget/folder_grid.dart';
 import '../widget/notification.dart';
+import 'recycle_bin_screen.dart';
 import 'settings_screen.dart';
 
 /// 首页
@@ -60,6 +61,16 @@ class _HomeScreenState extends State<HomeScreen> {
         toolbarHeight: 60,
         leading: const Icon(Icons.perm_media),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 24),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const RecycleBinScreen()),
+              );
+            },
+            tooltip: '回收站',
+          ),
           IconButton(
             icon: const Icon(Icons.settings, size: 24),
             onPressed: () {

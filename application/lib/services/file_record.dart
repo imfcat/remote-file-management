@@ -9,6 +9,7 @@ class FileRecord {
   final String md5Hash;
   final int? width;
   final int? height;
+  final int deletedAt;
 
   FileRecord({
     required this.filePath,
@@ -21,6 +22,7 @@ class FileRecord {
     required this.md5Hash,
     this.width,
     this.height,
+    required this.deletedAt,
   });
 
   factory FileRecord.fromJson(Map<String, dynamic> json) => FileRecord(
@@ -34,5 +36,6 @@ class FileRecord {
     md5Hash: json['md5_hash'],
     width: json['width'],
     height: json['height'],
+    deletedAt: json['deleted_at'],
   );
 }

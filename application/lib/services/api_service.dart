@@ -19,15 +19,18 @@ class ApiService {
 
   static Future<List<FileRecord>> listFiles({
     required String baseUrl,
-    required String folder,
-    required String sort,
-    required String order,
+    String? folder,
+    String? sort,
+    String? order,
+    bool isDeleted = false,
   }) async {
-    final uri = Uri.parse('$baseUrl/list_files').replace(queryParameters: {
-      'folder': folder,
-      'sort': sort,
-      'order': order,
-    });
+    final queryParams = <String, dynamic>{};
+    if (folder != null && folder.isNotEmpty) queryParams['folder'] = folder;
+    if (sort != null && sort.isNotEmpty) queryParams['sort'] = sort;
+    if (order != null && order.isNotEmpty) queryParams['order'] = order;
+    if (isDeleted) queryParams['is_deleted'] = 'true';
+
+    final uri = Uri.parse('$baseUrl/list_files').replace(queryParameters: queryParams);
     final res = await getWithTimeout(uri, timeout: _timeout);
     if (res.statusCode == 200) {
       final List<dynamic> data = jsonDecode(res.body)['files'];
@@ -49,6 +52,21 @@ class ApiService {
       throw Exception(msg);
     }
     onDeleted?.call();
+  }
+
+  static Future<void> restoreFile(
+      String baseUrl,
+      String filePath, {
+        VoidCallback? onRestored,
+      }) async {
+    final uri = Uri.parse('$baseUrl/restore_file')
+        .replace(queryParameters: {'file_path': filePath});
+    final res = await http.post(uri).timeout(_timeout);
+    if (res.statusCode != 200) {
+      final msg = res.body.isNotEmpty ? res.body : '恢复接口 ${res.statusCode}';
+      throw Exception(msg);
+    }
+    onRestored?.call();
   }
 
   static Future<void> setFolderMark(
