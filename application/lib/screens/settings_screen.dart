@@ -416,6 +416,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   enableMsg: '已切换到小缩略图',
                   disableMsg: '已切换到大缩略图',
                 ),
+                _buildSwitchSettingItem(
+                  title: '显示滚动条',
+                  value: settings.showScrollbar,
+                  onChanged: settings.toggleShowScrollbar,
+                  enableMsg: '已开启滚动条',
+                  disableMsg: '已关闭滚动条',
+                ),
 
                 const SizedBox(height: 20),
                 Container(

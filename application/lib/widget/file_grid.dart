@@ -30,6 +30,13 @@ class _FileGridState extends State<FileGrid> {
   bool _isSelecting = false;
   final Set<FileRecord> _selectedFiles = {};
   bool _isDeleting = false;
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -266,9 +273,10 @@ class _FileGridState extends State<FileGrid> {
                   ),
                 );
               }
-
+              Widget listViewWidget;
               if (!settings.isWaterfallFlow) {
-                return GridView.builder(
+                listViewWidget = GridView.builder(
+                  controller: _scrollController,
                   padding: const EdgeInsets.all(8),
                   cacheExtent: 200,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -280,27 +288,40 @@ class _FileGridState extends State<FileGrid> {
                   itemCount: files.length,
                   itemBuilder: (_, i) => buildItem(i),
                 );
+              } else {
+                listViewWidget = WaterfallFlow.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(8),
+                  cacheExtent: 200,
+                  gridDelegate: SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 8.0,
+                    mainAxisSpacing: 8.0,
+                    lastChildLayoutTypeBuilder: (index) =>
+                    index == files.length ? LastChildLayoutType.foot : LastChildLayoutType.none,
+                  ),
+                  itemCount: files.length,
+                  itemBuilder: (_, i) {
+                    final f = files[i];
+                    return SizedBox(
+                      height: _calculateItemHeight(context, f, crossAxisCount),
+                      child: buildItem(i),
+                    );
+                  },
+                );
               }
 
-              return WaterfallFlow.builder(
-                padding: const EdgeInsets.all(8),
-                cacheExtent: 200,
-                gridDelegate: SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 8.0,
-                  mainAxisSpacing: 8.0,
-                  lastChildLayoutTypeBuilder: (index) =>
-                  index == files.length ? LastChildLayoutType.foot : LastChildLayoutType.none,
-                ),
-                itemCount: files.length,
-                itemBuilder: (_, i) {
-                  final f = files[i];
-                  return SizedBox(
-                    height: _calculateItemHeight(context, f, crossAxisCount),
-                    child: buildItem(i),
-                  );
-                },
-              );
+              if (settings.showScrollbar) {
+                return Scrollbar(
+                  controller: _scrollController,
+                  interactive: true,
+                  thickness: 6,
+                  radius: const Radius.circular(8),
+                  child: listViewWidget,
+                );
+              }
+
+              return listViewWidget;
             },
           ),
         ),

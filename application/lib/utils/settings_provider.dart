@@ -14,6 +14,7 @@ class _StorageKeys {
   static const String showInfoSize = 'show_info_size';
   static const String showInfoResolution = 'show_info_resolution';
   static const String showInfoIcon = 'show_info_icon';
+  static const String showScrollbar = 'show_scrollbar';
 }
 
 class SettingsProvider extends ChangeNotifier {
@@ -30,6 +31,7 @@ class SettingsProvider extends ChangeNotifier {
   static const bool _defaultShowSize = false;
   static const bool _defaultShowResolution = false;
   static const bool _defaultShowIcon = false;
+  static const bool _defaultShowScrollbar = true;
 
   // 状态变量
   int _gridColumnCount = _defaultGridColumn;
@@ -44,6 +46,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _showInfoSize = _defaultShowSize;
   bool _showInfoResolution = _defaultShowResolution;
   bool _showInfoIcon = _defaultShowIcon;
+  bool _showScrollbar = _defaultShowScrollbar;
 
   //  getter
   int get gridColumnCount => _gridColumnCount;
@@ -58,6 +61,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get showInfoSize => _showInfoSize;
   bool get showInfoResolution => _showInfoResolution;
   bool get showInfoIcon => _showInfoIcon;
+  bool get showScrollbar => _showScrollbar;
 
   /// 初始化
   Future<void> init() async {
@@ -80,6 +84,7 @@ class SettingsProvider extends ChangeNotifier {
     _showInfoSize = prefs.getBool(_StorageKeys.showInfoSize) ?? _defaultShowSize;
     _showInfoResolution = prefs.getBool(_StorageKeys.showInfoResolution) ?? _defaultShowResolution;
     _showInfoIcon = prefs.getBool(_StorageKeys.showInfoIcon) ?? _defaultShowIcon;
+    _showScrollbar = prefs.getBool(_StorageKeys.showScrollbar) ?? _defaultShowScrollbar;
   }
 
   /// 设置网格列数
@@ -162,6 +167,13 @@ class SettingsProvider extends ChangeNotifier {
   void toggleShowInfoIcon(bool value) {
     _showInfoIcon = value;
     _saveBool(_StorageKeys.showInfoIcon, value);
+    notifyListeners();
+  }
+
+  /// 切换滚动条显示
+  void toggleShowScrollbar(bool value) {
+    _showScrollbar = value;
+    _saveBool(_StorageKeys.showScrollbar, value);
     notifyListeners();
   }
 
