@@ -118,8 +118,8 @@ class FileItem extends StatelessWidget {
             child: CachedNetworkImage(
               imageUrl: url,
               fit: fitMode,
-              placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-              errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+              placeholder: (_, _) => const Center(child: CircularProgressIndicator()),
+              errorWidget: (_, _, _) => const Icon(Icons.broken_image),
               cacheManager: customCacheManager(),
               key: ValueKey('${url}_$isSmallThumbnail'),
             ),

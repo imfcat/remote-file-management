@@ -274,7 +274,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                   maxScale: PhotoViewComputedScale.contained,
                 );
               },
-              loadingBuilder: (_, __) => const Center(child: CircularProgressIndicator()),
+              loadingBuilder: (_, _) => const Center(child: CircularProgressIndicator()),
               backgroundDecoration: const BoxDecoration(color: Colors.black),
             ),
           ),

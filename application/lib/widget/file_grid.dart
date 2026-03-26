@@ -23,6 +23,7 @@ class FileGrid extends StatefulWidget {
 class _FileGridState extends State<FileGrid> {
   String _sort = 'path';
   String _order = 'asc';
+  String _groupBy = 'none';
   late Future<List<FileRecord>> _future;
   List<FileRecord>? _files;
 
@@ -207,6 +208,48 @@ class _FileGridState extends State<FileGrid> {
     }
   }
 
+  String _getGroupFolder(FileRecord f) {
+    String path = f.file.replaceAll('\\', '/');
+    String root = f.rootFolder.replaceAll('\\', '/');
+
+    if (path.startsWith(root)) {
+      String rel = path.substring(root.length);
+      if (rel.startsWith('/')) rel = rel.substring(1);
+      List<String> parts = rel.split('/');
+      if (parts.length > 1) {
+        return parts.first;
+      } else {
+        return '根目录';
+      }
+    }
+
+    List<String> parts = path.split('/');
+    if (parts.length > 2) {
+      return parts[parts.length - 2];
+    }
+    return '根目录';
+  }
+
+  Widget _buildItemWidget(FileRecord f, SettingsProvider settings) {
+    return GestureDetector(
+      onTap: () => _handleItemTap(f, _files!.indexOf(f)),
+      onLongPress: () {
+        if (_isDeleting) return;
+        setState(() {
+          _isSelecting = true;
+          _selectedFiles.add(f);
+        });
+      },
+      child: FileItem(
+        file: f,
+        isSelecting: _isSelecting,
+        isSelected: _selectedFiles.contains(f),
+        isSmallThumbnail: settings.isSmallThumbnail,
+        isThumbnailCover: settings.isThumbnailCover,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context);
@@ -220,6 +263,7 @@ class _FileGridState extends State<FileGrid> {
           showCompareButton: _isTwoImagesSelected(),
           isDeleting: _isDeleting,
           sortOption: '$_sort-$_order',
+          groupBy: _groupBy,
           onCancelSelect: _exitSelectMode,
           onDelete: _deleteSelectedFiles,
           onCompare: () async {
@@ -249,6 +293,11 @@ class _FileGridState extends State<FileGrid> {
               _load();
             });
           },
+          onGroupByChanged: (val) {
+            setState(() {
+              _groupBy = val;
+            });
+          },
         ),
 
         Expanded(
@@ -258,75 +307,103 @@ class _FileGridState extends State<FileGrid> {
               if (!snap.hasData) return const Center(child: CircularProgressIndicator());
               final files = snap.data!;
 
-              Widget buildItem(int i) {
-                final f = files[i];
-                return GestureDetector(
-                  onTap: () => _handleItemTap(f, i),
-                  onLongPress: () {
-                    if (_isDeleting) return;
-                    setState(() {
-                      _isSelecting = true;
-                      _selectedFiles.add(f);
-                    });
-                  },
-                  child: FileItem(
-                    file: f,
-                    isSelecting: _isSelecting,
-                    isSelected: _selectedFiles.contains(f),
-                    isSmallThumbnail: settings.isSmallThumbnail,
-                    isThumbnailCover: settings.isThumbnailCover,
-                  ),
-                );
-              }
-              Widget listViewWidget;
-              if (!settings.isWaterfallFlow) {
-                listViewWidget = GridView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(8),
-                  cacheExtent: 200,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    childAspectRatio: 1,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: files.length,
-                  itemBuilder: (_, i) => buildItem(i),
-                );
+              // 分组逻辑
+              Map<String, List<FileRecord>> groupedFiles = {};
+              if (_groupBy == 'type') {
+                for (var f in files) {
+                  groupedFiles.putIfAbsent(f.mimeType.isNotEmpty ? f.mimeType : '未知类型', () => []).add(f);
+                }
+              } else if (_groupBy == 'folder') {
+                for (var f in files) {
+                  groupedFiles.putIfAbsent(_getGroupFolder(f), () => []).add(f);
+                }
               } else {
-                listViewWidget = WaterfallFlow.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(8),
-                  cacheExtent: 200,
-                  gridDelegate: SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    crossAxisSpacing: 8.0,
-                    mainAxisSpacing: 8.0,
-                    lastChildLayoutTypeBuilder: (index) =>
-                    index == files.length ? LastChildLayoutType.foot : LastChildLayoutType.none,
-                  ),
-                  itemCount: files.length,
-                  itemBuilder: (_, i) {
-                    final f = files[i];
-                    return SizedBox(
-                      height: _calculateItemHeight(context, f, crossAxisCount),
-                      child: buildItem(i),
-                    );
-                  },
-                );
+                groupedFiles = {'全部': files};
               }
 
+              var sortedKeys = groupedFiles.keys.toList()..sort();
+              List<Widget> slivers = [];
+
+              for (var key in sortedKeys) {
+                final groupItems = groupedFiles[key]!;
+
+                if (_groupBy != 'none') {
+                  slivers.add(
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 12, top: 16, bottom: 8),
+                        child: Text(
+                          '$key (${groupItems.length})',
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                // 添加网格或瀑布流列表
+                if (!settings.isWaterfallFlow) {
+                  slivers.add(
+                    SliverPadding(
+                      padding: const EdgeInsets.all(8),
+                      sliver: SliverGrid(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          childAspectRatio: 1,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                              (_, i) => _buildItemWidget(groupItems[i], settings),
+                          childCount: groupItems.length,
+                        ),
+                      ),
+                    ),
+                  );
+                } else {
+                  slivers.add(
+                    SliverPadding(
+                      padding: const EdgeInsets.all(8),
+                      sliver: SliverWaterfallFlow(
+                        gridDelegate: SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 8.0,
+                          mainAxisSpacing: 8.0,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                              (_, i) {
+                            final f = groupItems[i];
+                            return SizedBox(
+                              height: _calculateItemHeight(context, f, crossAxisCount),
+                              child: _buildItemWidget(f, settings),
+                            );
+                          },
+                          childCount: groupItems.length,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+              }
+
+              Widget scrollViewWidget = CustomScrollView(
+                controller: _scrollController,
+                cacheExtent: 200,
+                slivers: slivers,
+              );
+
               if (settings.showScrollbar) {
-                return Scrollbar(
+                return RawScrollbar(
                   controller: _scrollController,
                   interactive: true,
                   thickness: 6,
-                  radius: const Radius.circular(8),
-                  child: listViewWidget,
+                  radius: const Radius.circular(0),
+                  thumbColor: Colors.white12,
+                  child: scrollViewWidget,
                 );
               }
 
-              return listViewWidget;
+              return scrollViewWidget;
             },
           ),
         ),

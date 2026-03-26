@@ -8,11 +8,13 @@ class FileGridToolbar extends StatelessWidget {
   final bool showCompareButton;
   final bool isDeleting;
   final String sortOption;
+  final String groupBy;
   final VoidCallback onCancelSelect;
   final VoidCallback onDelete;
   final VoidCallback onCompare;
   final VoidCallback onRefresh;
   final Function(String) onSortChanged;
+  final Function(String) onGroupByChanged;
 
   const FileGridToolbar({
     super.key,
@@ -21,11 +23,13 @@ class FileGridToolbar extends StatelessWidget {
     required this.showCompareButton,
     required this.isDeleting,
     required this.sortOption,
+    required this.groupBy,
     required this.onCancelSelect,
     required this.onDelete,
     required this.onCompare,
     required this.onRefresh,
     required this.onSortChanged,
+    required this.onGroupByChanged,
   });
 
   @override
@@ -130,6 +134,22 @@ class FileGridToolbar extends StatelessWidget {
             },
           ),
           const Spacer(),
+          // 分组选择
+          DropdownButton<String>(
+            value: groupBy,
+            dropdownColor: Colors.grey[850],
+            style: const TextStyle(color: Colors.white),
+            items: const [
+              DropdownMenuItem(value: 'none', child: Text('无分组')),
+              DropdownMenuItem(value: 'type', child: Text('按类型')),
+              DropdownMenuItem(value: 'folder', child: Text('按目录')),
+            ],
+            onChanged: (val) {
+              if (val != null) onGroupByChanged(val);
+            },
+          ),
+          const SizedBox(width: 8),
+          // 排序选择
           DropdownButton<String>(
             value: sortOption,
             dropdownColor: Colors.grey[850],
