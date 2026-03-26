@@ -73,12 +73,11 @@ class _InitScreenState extends State<InitScreen> {
 
     // 拼接协议和地址
     final fullUrl = '$_selectedProtocol$urlWithoutProtocol';
-
+    final provider = Provider.of<BackendProvider>(context, listen: false);
     setState(() => _loading = true);
     try {
       await ApiService.listRootFolders(fullUrl);
-      await Provider.of<BackendProvider>(context, listen: false)
-          .setBackendUrl(fullUrl);
+      await provider.setBackendUrl(fullUrl);
       if (!mounted) return;
       Navigator.pushReplacement(
         context,

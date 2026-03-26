@@ -103,6 +103,7 @@ class _FileGridState extends State<FileGrid> {
     );
 
     if (!confirm) return;
+    if (!mounted) return;
 
     setState(() {
       _isDeleting = true;
@@ -233,7 +234,11 @@ class _FileGridState extends State<FileGrid> {
                 ),
               ),
             );
-            if (deleted == true) reload(); else _exitSelectMode();
+            if (deleted == true) {
+              reload();
+            } else {
+              _exitSelectMode();
+            }
           },
           onRefresh: reload,
           onSortChanged: (val) {

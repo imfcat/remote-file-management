@@ -232,7 +232,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required Function(int) onSave,  // 保存回调
     String successMsg = '设置成功',  // 成功提示语
   }) {
-    void _handleTap() {
+    void handleTap() {
       switch (type) {
         case SettingItemType.numberInput:
           _showNumberInputDialog(
@@ -262,7 +262,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     return InkWell(
-      onTap: _handleTap,
+      onTap: handleTap,
       child: _buildSettingItemContainer(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -292,13 +292,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String enableMsg,
     required String disableMsg,
   }) {
-    void _handleSwitchChange(bool newValue) {
+    void handleSwitchChange(bool newValue) {
       onChanged(newValue);
       _showSnackBar(newValue ? enableMsg : disableMsg);
     }
 
     return InkWell(
-      onTap: () => _handleSwitchChange(!value),
+      onTap: () => handleSwitchChange(!value),
       child: _buildSettingItemContainer(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -312,7 +312,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 alignment: Alignment.center,
                 child: Switch(
                   value: value,
-                  onChanged: _handleSwitchChange,
+                  onChanged: handleSwitchChange,
                   activeThumbColor: Colors.blue,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   activeTrackColor: Colors.blue.withValues(alpha: 0.3),

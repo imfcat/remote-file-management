@@ -118,10 +118,6 @@ class _ImageComparePageState extends State<ImageComparePage> {
 
     stream.addListener(listener);
 
-    completer.future.catchError((_) {
-      stream.removeListener(listener);
-    });
-
     return completer.future;
   }
 
@@ -388,8 +384,11 @@ class _ImageComparePageState extends State<ImageComparePage> {
                 ),
                 onPressed: () {
                   setState(() {
-                    if(isLeft) _expandLeftInfo = !_expandLeftInfo;
-                    else _expandRightInfo = !_expandRightInfo;
+                    if(isLeft) {
+                      _expandLeftInfo = !_expandLeftInfo;
+                    } else {
+                      _expandRightInfo = !_expandRightInfo;
+                    }
                   });
                 },
               ),
@@ -790,7 +789,7 @@ class UiImageProvider extends ImageProvider<UiImageProvider> {
   }
 
   @override
-  ImageStreamCompleter loadBuffer(UiImageProvider key, DecoderBufferCallback decode) {
+  ImageStreamCompleter loadImage(UiImageProvider key, ImageDecoderCallback decode) {
     return OneFrameImageStreamCompleter(
       Future.value(
         ImageInfo(

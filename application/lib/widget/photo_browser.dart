@@ -132,9 +132,11 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       },
     );
     if (confirm != true) return;
+    if (!mounted) return;
 
     final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
     await ApiService.deleteFile(url, f.filePath, onDeleted: () {
+      if (!mounted) return;
       setState(() {
         widget.files.remove(f);
         _hasDeleted = true;
@@ -185,7 +187,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     ];
 
     // 切换到上一页
-    void _prevPage() {
+    void prevPage() {
       if (_current > 0) {
         setState(() {
           _lastDirection = SlideDirection.forward;
@@ -201,7 +203,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     }
 
     // 切换到下一页
-    void _nextPage() {
+    void nextPage() {
       if (_current < total - 1) {
         setState(() {
           _lastDirection = SlideDirection.backward;
@@ -285,7 +287,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               width: clickAreaActualWidth,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: _prevPage,
+                onTap: prevPage,
               ),
             ),
 
@@ -298,7 +300,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               width: clickAreaActualWidth,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: _nextPage,
+                onTap: nextPage,
               ),
             ),
 

@@ -51,7 +51,7 @@ class _FolderGridState extends State<FolderGrid> {
               onColorChanged: (Color color) async {
                 Navigator.pop(dialogContext);
                 // 颜色转换
-                String colorMark = '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+                String colorMark = '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
 
                 try {
                   final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;

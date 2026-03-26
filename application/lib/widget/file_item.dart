@@ -50,7 +50,7 @@ class FileItem extends StatelessWidget {
     // 标题显示
     if (settings.showInfoTitle) {
       infoLines.add(Text(
-        file.file ?? '未知名称',
+        file.file,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.2),
