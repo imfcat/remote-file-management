@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import config
 from server.handlers import (
     list_root_folders, list_files, delete_file,
-    file_info, file_content, folder_mark
+    file_info, file_content, folder_mark, restore_file
 )
 from utils.scanner import scan_directory
 from database.connection import SessionLocal
@@ -39,6 +39,7 @@ app.add_middleware(
 app.get("/list_root_folders")(list_root_folders)
 app.get("/list_files")(list_files)
 app.delete("/delete_file")(delete_file)
+app.post("/restore_file")(restore_file)
 app.get("/file_info")(file_info)
 app.get("/file_content")(file_content)
 app.get("/folder_mark")(folder_mark)

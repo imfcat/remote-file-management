@@ -6,7 +6,7 @@ from core.logger import debug, info, warning, error
 from database.models import FileRecord, FolderRecord
 from utils.needs_update import folder_changed
 from utils.utils import get_md5, get_image_size
-from utils.thumb import make_thumb
+from utils.thumb import make_thumb, get_video_dimensions
 from utils.cleaner import clean_missing_resources
 import tqdm
 import concurrent.futures
@@ -29,7 +29,6 @@ def _scan(root_path: Path, session_factory):
             if p.is_dir() and not p.name.startswith('.')
         ]
 
-        all_media_files = []
         for folder in dirs:
             folder_path = root_path / folder
             if not folder_changed(session, str(root_path), folder):
@@ -37,6 +36,7 @@ def _scan(root_path: Path, session_factory):
                 continue
             info(f'(SCAN) 扫描目录 [{folder}]')
             count_files = 0
+            all_media_files = []
 
             # 清除该文件夹旧记录
             session.query(FileRecord).filter(FileRecord.root_folder == folder).delete()
@@ -83,6 +83,10 @@ def _process_file(session: Session, root_dir: Path, folder: str, dirpath: Path, 
             width, height = get_image_size(str(file_path))
         elif ext in VIDEO_EXT:
             file_type = 'video'
+            try:
+                width, height = get_video_dimensions(str(file_path))
+            except Exception as e:
+                width, height = None, None
         elif ext in TEXT_EXT:
             file_type = 'text'
 

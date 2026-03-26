@@ -38,3 +38,4 @@ class FileRecord(Base):
     md5_hash = Column(String, nullable=False, comment="文件MD5哈希值")
     width = Column(Integer, nullable=True, comment="图片宽度（仅图片类型）")
     height = Column(Integer, nullable=True, comment="图片高度（仅图片类型）")
+    deleted_at = Column(Integer, default=0, nullable=False, comment="删除时间戳")
