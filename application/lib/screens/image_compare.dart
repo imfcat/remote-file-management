@@ -295,7 +295,7 @@ class _ImageComparePageState extends State<ImageComparePage> {
       await ApiService.deleteFile(widget.backendUrl, widget.image1.filePath, onDeleted: () {
         if (mounted) {
           AppNotification.show(message: '左侧图片删除成功', type: NotificationType.warning, duration: Duration(seconds: 1));
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         }
       });
     } catch (e) {
@@ -314,7 +314,7 @@ class _ImageComparePageState extends State<ImageComparePage> {
       await ApiService.deleteFile(widget.backendUrl, widget.image2.filePath, onDeleted: () {
         if (mounted) {
           AppNotification.show(message: '右侧图片删除成功', type: NotificationType.warning, duration: Duration(seconds: 1));
-          Navigator.pop(context);
+          Navigator.pop(context, true);
         }
       });
     } catch (e) {

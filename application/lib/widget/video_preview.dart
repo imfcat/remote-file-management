@@ -25,6 +25,17 @@ class _VideoPreviewState extends State<VideoPreview> {
     _initializeVideoPlayer();
   }
 
+  @override
+  void didUpdateWidget(VideoPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoUrl != widget.videoUrl) {
+      _videoPlayerController?.dispose();
+      _videoPlayerController = null;
+      _isInitializing = false;
+      _initializeVideoPlayer();
+    }
+  }
+
   Future<void> _initializeVideoPlayer() async {
     if (_isInitializing || widget.videoUrl.isEmpty) return;
 
