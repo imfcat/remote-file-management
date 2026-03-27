@@ -44,14 +44,14 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     final List<int> cacheOrder = [];
     cacheOrder.add(current);
     // 缓存后n张
-    for (int i = 1; i <= 10; i++) {
+    for (int i = 1; i <= 3; i++) {
       final nextIndex = current + i;
       if (nextIndex < urls.length) {
         cacheOrder.add(nextIndex);
       }
     }
     // 缓存前n张
-    for (int i = 1; i <= 10; i++) {
+    for (int i = 1; i <= 3; i++) {
       final prevIndex = current - i;
       if (prevIndex >= 0) {
         cacheOrder.add(prevIndex);

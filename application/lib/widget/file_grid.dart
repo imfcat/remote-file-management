@@ -24,8 +24,10 @@ class _FileGridState extends State<FileGrid> {
   String _sort = 'path';
   String _order = 'asc';
   String _groupBy = 'none';
-  late Future<List<FileRecord>> _future;
-  List<FileRecord>? _files;
+  bool _isLoading = true;
+  List<FileRecord> _files = [];
+  Map<String, List<FileRecord>> _groupedFiles = {};
+  List<String> _sortedKeys = [];
 
   // 选择模式状态
   bool _isSelecting = false;
@@ -46,19 +48,51 @@ class _FileGridState extends State<FileGrid> {
   }
 
   void _load() {
-    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
     setState(() {
-      _future = ApiService.listFiles(
-        baseUrl: url,
-        folder: widget.folder,
-        sort: _sort,
-        order: _order,
-      ).then((list) => _files = list).catchError((e) {
-        if (mounted) {
-          AppNotification.show(message: '列表加载失败: $e', type: NotificationType.error, duration: const Duration(seconds: 3));
-        }
-        return <FileRecord>[];
-      });
+      _isLoading = true;
+    });
+
+    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+    ApiService.listFiles(
+      baseUrl: url,
+      folder: widget.folder,
+      sort: _sort,
+      order: _order,
+    ).then((list) {
+      if (!mounted) return;
+      _files = list;
+      _processData();
+    }).catchError((e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        AppNotification.show(message: '列表加载失败: $e', type: NotificationType.error, duration: const Duration(seconds: 3));
+      }
+    });
+  }
+
+  void _processData() {
+    // 分组逻辑
+    Map<String, List<FileRecord>> tempGroup = {};
+    if (_groupBy == 'type') {
+      for (var f in _files) {
+        tempGroup.putIfAbsent(f.mimeType.isNotEmpty ? f.mimeType : '未知类型', () => []).add(f);
+      }
+    } else if (_groupBy == 'folder') {
+      for (var f in _files) {
+        tempGroup.putIfAbsent(_getGroupFolder(f), () => []).add(f);
+      }
+    } else {
+      tempGroup = {'全部': _files};
+    }
+
+    var tempKeys = tempGroup.keys.toList()..sort();
+
+    setState(() {
+      _groupedFiles = tempGroup;
+      _sortedKeys = tempKeys;
+      _isLoading = false;
     });
   }
 
@@ -126,17 +160,16 @@ class _FileGridState extends State<FileGrid> {
         await ApiService.deleteFile(url, file.filePath);
       }
 
-      setState(() {
-        _files!.removeWhere((file) => _selectedFiles.contains(file));
-        _exitSelectMode();
-      });
+      _files.removeWhere((file) => _selectedFiles.contains(file));
+      _exitSelectMode();
+      _processData();
 
       if (mounted) {
-        AppNotification.show(message: '成功删除$selectedCount个文件', type: NotificationType.warning, duration: Duration(seconds: 2));
+        AppNotification.show(message: '成功删除$selectedCount个文件', type: NotificationType.warning, duration: const Duration(seconds: 2));
       }
     } catch (e) {
       if (mounted) {
-        AppNotification.show(message: '批量删除失败：$e（选中$selectedCount个文件）', type: NotificationType.error, duration: Duration(seconds: 3));
+        AppNotification.show(message: '批量删除失败：$e（选中$selectedCount个文件）', type: NotificationType.error, duration: const Duration(seconds: 3));
       }
     } finally {
       // 解除锁定
@@ -199,12 +232,12 @@ class _FileGridState extends State<FileGrid> {
     if (_isSelecting) {
       _toggleFileSelection(f);
     } else {
-      final originalLength = _files?.length ?? 0;
+      final originalLength = _files.length;
       final deleted = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (_) => PhotoBrowser(files: _files!, initialIndex: index)),
+        MaterialPageRoute(builder: (_) => PhotoBrowser(files: _files, initialIndex: index)),
       );
-      if (deleted == true || _files?.length != originalLength) reload();
+      if (deleted == true || _files.length != originalLength) reload();
     }
   }
 
@@ -232,7 +265,7 @@ class _FileGridState extends State<FileGrid> {
 
   Widget _buildItemWidget(FileRecord f, SettingsProvider settings) {
     return GestureDetector(
-      onTap: () => _handleItemTap(f, _files!.indexOf(f)),
+      onTap: () => _handleItemTap(f, _files.indexOf(f)),
       onLongPress: () {
         if (_isDeleting) return;
         setState(() {
@@ -290,42 +323,28 @@ class _FileGridState extends State<FileGrid> {
             setState(() {
               _sort = parts[0];
               _order = parts[1];
-              _load();
             });
+            _load();
           },
           onGroupByChanged: (val) {
-            setState(() {
-              _groupBy = val;
-            });
+            if (_groupBy != val) {
+              setState(() {
+                _groupBy = val;
+              });
+              _processData();
+            }
           },
         ),
 
         Expanded(
-          child: FutureBuilder<List<FileRecord>>(
-            future: _future,
-            builder: (_, snap) {
-              if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-              final files = snap.data!;
-
-              // 分组逻辑
-              Map<String, List<FileRecord>> groupedFiles = {};
-              if (_groupBy == 'type') {
-                for (var f in files) {
-                  groupedFiles.putIfAbsent(f.mimeType.isNotEmpty ? f.mimeType : '未知类型', () => []).add(f);
-                }
-              } else if (_groupBy == 'folder') {
-                for (var f in files) {
-                  groupedFiles.putIfAbsent(_getGroupFolder(f), () => []).add(f);
-                }
-              } else {
-                groupedFiles = {'全部': files};
-              }
-
-              var sortedKeys = groupedFiles.keys.toList()..sort();
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : Builder(
+            builder: (context) {
               List<Widget> slivers = [];
 
-              for (var key in sortedKeys) {
-                final groupItems = groupedFiles[key]!;
+              for (var key in _sortedKeys) {
+                final groupItems = _groupedFiles[key]!;
 
                 if (_groupBy != 'none') {
                   slivers.add(
@@ -388,7 +407,7 @@ class _FileGridState extends State<FileGrid> {
 
               Widget scrollViewWidget = CustomScrollView(
                 controller: _scrollController,
-                cacheExtent: 200,
+                cacheExtent: 500,
                 slivers: slivers,
               );
 
