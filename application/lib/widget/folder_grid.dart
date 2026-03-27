@@ -22,7 +22,49 @@ class FolderGrid extends StatefulWidget {
   State<FolderGrid> createState() => _FolderGridState();
 }
 
-class _FolderGridState extends State<FolderGrid> {
+class _FolderGridState extends State<FolderGrid> with SingleTickerProviderStateMixin {
+
+  String? _flashingFolder;
+  late AnimationController _flashController;
+  late Animation<Color?> _flashAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _flashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _flashAnimation = ColorTween(
+      begin: Colors.transparent,
+      end: Colors.white24,
+    ).animate(CurvedAnimation(parent: _flashController, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _flashController.dispose();
+    super.dispose();
+  }
+
+  void _highlightFolder(String folderName) {
+    setState(() {
+      _flashingFolder = folderName;
+    });
+
+    _flashController.repeat(reverse: true);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted && _flashingFolder == folderName) {
+        _flashController.stop();
+        _flashController.reset();
+        setState(() {
+          _flashingFolder = null;
+        });
+      }
+    });
+  }
+
   // 解析颜色
   Color _parseFolderColor(Folder folder) {
     if (folder.mark == null || folder.mark!.isEmpty) {
@@ -102,16 +144,32 @@ class _FolderGridState extends State<FolderGrid> {
         final folder = widget.folders[index];
         final folderColor = _parseFolderColor(folder);
 
-        return Card(
-          elevation: 0,
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => FileListScreen(folder: folder.folderName),
+        return AnimatedBuilder(
+          animation: _flashController,
+          builder: (context, child) {
+            final isFlashing = _flashingFolder == folder.folderName;
+            return Card(
+              elevation: 0,
+              color: isFlashing ? _flashAnimation.value : Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ),
+              child: child,
+            );
+          },
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FileListScreen(folder: folder.folderName),
+                ),
+              );
+              if (mounted) {
+                _highlightFolder(folder.folderName);
+              }
+            },
             onLongPress: () => _showColorPickerDialog(context, folder),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
