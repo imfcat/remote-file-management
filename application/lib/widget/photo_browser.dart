@@ -314,35 +314,38 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
-                        onPressed: () => Navigator.pop(context, _hasDeleted),
-                      ),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.5,
+                  Expanded(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.arrow_back, color: Colors.white, shadows: shadows),
+                          onPressed: () => Navigator.pop(context, _hasDeleted),
                         ),
-                        child: Text(
-                          cf.fileName,
-                          style: TextStyle(fontSize: 18, shadows: shadows),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
+                        Flexible(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cf.fileName,
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, shadows: shadows, color: Colors.white),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                              Text(
+                                '${_formatBytes(cf.fileSize)}  (${cf.width}x${cf.height})',
+                                style: TextStyle(color: Colors.white70, fontSize: 12, shadows: shadows),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        '${cf.width}x${cf.height}\n${_formatBytes(cf.fileSize)}',
-                        style: TextStyle(color: Colors.white70, fontSize: 14, shadows: shadows),
-                        textAlign: TextAlign.right
-                      ),
-                      const SizedBox(width: 16),
                       Text(
                         '${_current + 1} / $total',
                         style: TextStyle(color: Colors.white70, fontSize: 14, shadows: shadows),
@@ -350,7 +353,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                       const SizedBox(width: 8),
                       // 信息弹窗按钮
                       IconButton(
-                        icon: const Icon(Icons.info_outline, color: Colors.white),
+                        icon: Icon(Icons.info_outline, color: Colors.white, shadows: shadows),
                         onPressed: () => _showInfo(context, cf),
                       ),
                       // 原图切换按钮
@@ -358,13 +361,13 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                       IconButton(
                         icon: Icon(
                           _showOriginal ? Icons.image : Icons.image_outlined,
-                          color: _showOriginal ? Colors.blue : Colors.white,
+                          color: _showOriginal ? Colors.blue : Colors.white, shadows: shadows
                         ),
                         onPressed: _toggleOriginalWithSnackBar,
                       ),
                       // 删除按钮
                       IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.white),
+                        icon: Icon(Icons.delete, color: Colors.white, shadows: shadows),
                         onPressed: () => _deleteFile(cf),
                       ),
                     ],

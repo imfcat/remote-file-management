@@ -32,13 +32,137 @@ class FileGridToolbar extends StatelessWidget {
     required this.onGroupByChanged,
   });
 
+  // 二级设置菜单
+  void _showMobileSettingsMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext sheetContext) {
+        String localSort = sortOption;
+        String localGroup = groupBy;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Consumer<SettingsProvider>(
+              builder: (context, settings, child) {
+                return SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // 列数设置
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('网格列数', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  color: Colors.white,
+                                  disabledColor: Colors.grey[700],
+                                  onPressed: settings.fileListColumnCount > 1
+                                      ? () => settings.setFileListColumnCount(settings.fileListColumnCount - 1)
+                                      : null,
+                                ),
+                                Container(
+                                  constraints: const BoxConstraints(minWidth: 24),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                      '${settings.fileListColumnCount}',
+                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  color: Colors.white,
+                                  disabledColor: Colors.grey[700],
+                                  onPressed: settings.fileListColumnCount < 20
+                                      ? () => settings.setFileListColumnCount(settings.fileListColumnCount + 1)
+                                      : null,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // 分组选择
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('分组方式', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            DropdownButton<String>(
+                              value: localGroup,
+                              dropdownColor: Colors.grey[850],
+                              style: const TextStyle(color: Colors.white),
+                              underline: const SizedBox(),
+                              items: const [
+                                DropdownMenuItem(value: 'none', child: Text('无分组')),
+                                DropdownMenuItem(value: 'type', child: Text('按类型')),
+                                DropdownMenuItem(value: 'folder', child: Text('按目录')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => localGroup = val);
+                                  onGroupByChanged(val);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // 排序选择
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('排序方式', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            DropdownButton<String>(
+                              value: localSort,
+                              dropdownColor: Colors.grey[850],
+                              style: const TextStyle(color: Colors.white),
+                              underline: const SizedBox(),
+                              items: const [
+                                DropdownMenuItem(value: 'path-asc', child: Text('路径 正序')),
+                                DropdownMenuItem(value: 'path-desc', child: Text('路径 倒序')),
+                                DropdownMenuItem(value: 'name-asc', child: Text('名称 正序')),
+                                DropdownMenuItem(value: 'name-desc', child: Text('名称 倒序')),
+                                DropdownMenuItem(value: 'type-asc', child: Text('类型 正序')),
+                                DropdownMenuItem(value: 'type-desc', child: Text('类型 倒序')),
+                                DropdownMenuItem(value: 'size-asc', child: Text('大小 正序')),
+                                DropdownMenuItem(value: 'size-desc', child: Text('大小 倒序')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => localSort = val);
+                                  onSortChanged(val);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isSelecting) {
       return Container(
         height: 60,
         color: Colors.grey[900],
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
             Text('已选择: $selectedCount', style: const TextStyle(color: Colors.white)),
@@ -63,6 +187,7 @@ class FileGridToolbar extends StatelessWidget {
 
     final settings = Provider.of<SettingsProvider>(context);
     final crossAxisCount = settings.fileListColumnCount;
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Container(
       height: 60,
@@ -70,33 +195,35 @@ class FileGridToolbar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
         children: [
-          // 列数显示
-          IconButton(
-            icon: const Icon(Icons.remove_circle_outline),
-            color: Colors.white,
-            disabledColor: Colors.grey[700],
-            tooltip: '减少列数',
-            onPressed: crossAxisCount > 1
-                ? () => settings.setFileListColumnCount(crossAxisCount - 1)
-                : null,
-          ),
-          Container(
-            constraints: const BoxConstraints(minWidth: 20),
-            alignment: Alignment.center,
-            child: Text(
-                '$crossAxisCount',
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+          if (!isMobile) ...[
+            IconButton(
+              icon: const Icon(Icons.remove_circle_outline),
+              color: Colors.white,
+              disabledColor: Colors.grey[700],
+              tooltip: '减少列数',
+              onPressed: crossAxisCount > 1
+                  ? () => settings.setFileListColumnCount(crossAxisCount - 1)
+                  : null,
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline),
-            color: Colors.white,
-            disabledColor: Colors.grey[700],
-            tooltip: '增加列数',
-            onPressed: crossAxisCount < 20
-                ? () => settings.setFileListColumnCount(crossAxisCount + 1)
-                : null,
-          ),
+            Container(
+              constraints: const BoxConstraints(minWidth: 20),
+              alignment: Alignment.center,
+              child: Text(
+                  '$crossAxisCount',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              color: Colors.white,
+              disabledColor: Colors.grey[700],
+              tooltip: '增加列数',
+              onPressed: crossAxisCount < 20
+                  ? () => settings.setFileListColumnCount(crossAxisCount + 1)
+                  : null,
+            ),
+          ],
+
           // 布局切换按钮
           IconButton(
             icon: Icon(settings.isWaterfallFlow ? Icons.dashboard : Icons.grid_view, color: Colors.white),
@@ -134,41 +261,50 @@ class FileGridToolbar extends StatelessWidget {
             },
           ),
           const Spacer(),
-          // 分组选择
-          DropdownButton<String>(
-            value: groupBy,
-            dropdownColor: Colors.grey[850],
-            style: const TextStyle(color: Colors.white),
-            items: const [
-              DropdownMenuItem(value: 'none', child: Text('无分组')),
-              DropdownMenuItem(value: 'type', child: Text('按类型')),
-              DropdownMenuItem(value: 'folder', child: Text('按目录')),
-            ],
-            onChanged: (val) {
-              if (val != null) onGroupByChanged(val);
-            },
-          ),
-          const SizedBox(width: 8),
-          // 排序选择
-          DropdownButton<String>(
-            value: sortOption,
-            dropdownColor: Colors.grey[850],
-            style: const TextStyle(color: Colors.white),
-            items: const [
-              DropdownMenuItem(value: 'path-asc', child: Text('路径 正序')),
-              DropdownMenuItem(value: 'path-desc', child: Text('路径 倒序')),
-              DropdownMenuItem(value: 'name-asc', child: Text('名称 正序')),
-              DropdownMenuItem(value: 'name-desc', child: Text('名称 倒序')),
-              DropdownMenuItem(value: 'type-asc', child: Text('类型 正序')),
-              DropdownMenuItem(value: 'type-desc', child: Text('类型 倒序')),
-              DropdownMenuItem(value: 'size-asc', child: Text('大小 正序')),
-              DropdownMenuItem(value: 'size-desc', child: Text('大小 倒序')),
-            ],
-            onChanged: (val) {
-              if (val != null) onSortChanged(val);
-            },
-          ),
-          const SizedBox(width: 8),
+          if (!isMobile) ...[
+            // 分组选择
+            DropdownButton<String>(
+              value: groupBy,
+              dropdownColor: Colors.grey[850],
+              style: const TextStyle(color: Colors.white),
+              items: const [
+                DropdownMenuItem(value: 'none', child: Text('无分组')),
+                DropdownMenuItem(value: 'type', child: Text('按类型')),
+                DropdownMenuItem(value: 'folder', child: Text('按目录')),
+              ],
+              onChanged: (val) {
+                if (val != null) onGroupByChanged(val);
+              },
+            ),
+            const SizedBox(width: 8),
+            // 排序选择
+            DropdownButton<String>(
+              value: sortOption,
+              dropdownColor: Colors.grey[850],
+              style: const TextStyle(color: Colors.white),
+              items: const [
+                DropdownMenuItem(value: 'path-asc', child: Text('路径 正序')),
+                DropdownMenuItem(value: 'path-desc', child: Text('路径 倒序')),
+                DropdownMenuItem(value: 'name-asc', child: Text('名称 正序')),
+                DropdownMenuItem(value: 'name-desc', child: Text('名称 倒序')),
+                DropdownMenuItem(value: 'type-asc', child: Text('类型 正序')),
+                DropdownMenuItem(value: 'type-desc', child: Text('类型 倒序')),
+                DropdownMenuItem(value: 'size-asc', child: Text('大小 正序')),
+                DropdownMenuItem(value: 'size-desc', child: Text('大小 倒序')),
+              ],
+              onChanged: (val) {
+                if (val != null) onSortChanged(val);
+              },
+            ),
+            const SizedBox(width: 8),
+          ] else ...[
+            IconButton(
+              icon: const Icon(Icons.tune, color: Colors.white),
+              tooltip: '视图与排序设置',
+              onPressed: () => _showMobileSettingsMenu(context),
+            ),
+          ],
+
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
             tooltip: '刷新文件列表',
