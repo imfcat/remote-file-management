@@ -159,27 +159,39 @@ class _FileGridState extends State<FileGrid> {
       final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
 
       final filesToDelete = _selectedFiles.toList();
+      List<String> failedFiles = [];
+      int successCount = 0;
       for (var file in filesToDelete) {
-        await ApiService.deleteFile(url, file.filePath);
+        try {
+          await ApiService.deleteFile(url, file.filePath);
+          _files.remove(file);
+          successCount++;
+        } catch (innerE) {
+          debugPrint('文件 ${file.fileName} 删除失败: $innerE');
+          failedFiles.add(file.fileName);
+        }
       }
 
-      _files.removeWhere((file) => _selectedFiles.contains(file));
-      _exitSelectMode();
-      _processData();
-
       if (mounted) {
-        AppNotification.show(message: '成功删除$selectedCount个文件', type: NotificationType.warning, duration: const Duration(seconds: 2));
+        if (failedFiles.isEmpty) {
+          AppNotification.show(message: '成功删除$successCount个文件', type: NotificationType.warning, duration: const Duration(seconds: 2));
+        } else {
+          AppNotification.show(
+              message: '删除了$successCount个文件，但有${failedFiles.length}个失败',
+              type: NotificationType.error,
+              duration: const Duration(seconds: 4)
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        AppNotification.show(message: '批量删除失败：$e（选中$selectedCount个文件）', type: NotificationType.error, duration: const Duration(seconds: 3));
+        AppNotification.show(message: '批量删除遇到错误：$e', type: NotificationType.error, duration: const Duration(seconds: 3));
       }
     } finally {
-      // 解除锁定
+      _exitSelectMode();
+      _processData();
       if (mounted) {
-        setState(() {
-          _isDeleting = false;
-        });
+        setState(() => _isDeleting = false);
       }
     }
   }

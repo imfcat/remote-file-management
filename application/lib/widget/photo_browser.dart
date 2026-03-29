@@ -40,26 +40,20 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
   }
 
   void _preload(int current) async {
-    final urls = widget.files.map((f) => mediumUrl(context, f.file)).toList();
-    final List<int> cacheOrder = [];
-    cacheOrder.add(current);
+    final List<int> cacheOrder = [current];
+    final total = widget.files.length;
+
     // 缓存后n张
     for (int i = 1; i <= 3; i++) {
-      final nextIndex = current + i;
-      if (nextIndex < urls.length) {
-        cacheOrder.add(nextIndex);
-      }
+      if (current + i < total) cacheOrder.add(current + i);
     }
     // 缓存前n张
     for (int i = 1; i <= 3; i++) {
-      final prevIndex = current - i;
-      if (prevIndex >= 0) {
-        cacheOrder.add(prevIndex);
-      }
+      if (current - i >= 0) cacheOrder.add(current - i);
     }
     // 执行缓存操作
     for (final index in cacheOrder) {
-      final url = urls[index];
+      final url = mediumUrl(context, widget.files[index].file);
       // 检查是否已缓存
       final fileInfo = await customCacheManager().getFileFromCache(url);
       if (fileInfo == null) {
@@ -151,7 +145,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
         } else if (_lastDirection == SlideDirection.forward) {
           targetPage = (_current - 1).clamp(0, widget.files.length - 1);
         } else {
-          targetPage = (_current - 1).clamp(0, widget.files.length - 1);
+          targetPage = _current.clamp(0, widget.files.length - 1);
         }
         _current = targetPage;
         _controller.jumpToPage(targetPage);
