@@ -39,3 +39,4 @@ class FileRecord(Base):
     width = Column(Integer, nullable=True, comment="图片宽度（仅图片类型）")
     height = Column(Integer, nullable=True, comment="图片高度（仅图片类型）")
     deleted_at = Column(Integer, default=0, nullable=False, comment="删除时间戳")
+    phash = Column(String, nullable=True, comment="图片pHash值")

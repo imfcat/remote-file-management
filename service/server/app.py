@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config import config
 from server.handlers import (
     list_root_folders, list_files, delete_file,
-    file_info, file_content, folder_mark, restore_file
+    file_info, file_content, folder_mark, restore_file,
+    calculate_folder_phash, phash_status, find_similar_images
 )
 from utils.scanner import scan_directory
 from database.connection import SessionLocal
@@ -43,3 +44,6 @@ app.post("/restore_file")(restore_file)
 app.get("/file_info")(file_info)
 app.get("/file_content")(file_content)
 app.get("/folder_mark")(folder_mark)
+app.post("/calculate_phash")(calculate_folder_phash)
+app.get("/phash_status")(phash_status)
+app.get("/find_similar_images")(find_similar_images)

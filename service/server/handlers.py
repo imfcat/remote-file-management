@@ -4,12 +4,16 @@ import shutil
 import urllib.parse
 from pathlib import Path
 from typing import Optional
-from fastapi import HTTPException, Query, Depends
+from PIL import Image
+import imagehash
+from fastapi import HTTPException, Query, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
-from database.connection import get_db
+from database.connection import get_db, SessionLocal
 from database.models import FolderRecord, FileRecord
 from core.config import config
+from core.logger import info, error
 
+PHASH_TASKS = {}
 
 def list_root_folders(db: Session = Depends(get_db)):
     query = db.query(FolderRecord)
@@ -183,3 +187,144 @@ def folder_mark(
     if not record:
         raise HTTPException(status_code=404, detail="数据库无此文件")
     return {"message": "标记成功", "mark": str(mark)}
+
+
+def _compute_and_save_phash(folder: str):
+    db = SessionLocal()
+    try:
+        info(f"[pHash] 开始扫描并计算目录 [{folder}] 中图片的pHash")
+
+        files = db.query(FileRecord).filter(
+            FileRecord.root_folder == folder,
+            FileRecord.file_type == 'image',
+            FileRecord.phash.is_(None),
+            FileRecord.deleted_at == 0
+        ).all()
+
+        if not files:
+            info(f"[pHash] 目录 [{folder}] 没有需要计算的图片")
+            return
+
+        success_count = 0
+        for record in files:
+            try:
+                with Image.open(record.file_path) as img:
+                    phash_value = str(imagehash.phash(img))
+                    record.phash = phash_value
+                    success_count += 1
+            except Exception as e:
+                error(f"[pHash] 文件计算失败 {record.file_path}: {e}")
+
+        db.commit()
+        info(f"[pHash] 目录 [{folder}] 计算完成，共处理 {success_count} 张图片")
+        pass
+    except Exception as e:
+        error(f"[pHash] 目录 [{folder}] 处理时发生严重异常: {e}")
+    finally:
+        db.close()
+        PHASH_TASKS[folder] = False
+
+
+def calculate_folder_phash(
+        folder: str = Query(..., description="一级文件夹名"),
+        background_tasks: BackgroundTasks = BackgroundTasks(),
+        db: Session = Depends(get_db)
+):
+    if PHASH_TASKS.get(folder, False):
+        return {"message": "任务正在进行中", "status": "running"}
+
+    count = db.query(FileRecord).filter(
+        FileRecord.root_folder == folder,
+        FileRecord.file_type == 'image',
+        FileRecord.phash.is_(None),
+        FileRecord.deleted_at == 0
+    ).count()
+
+    if count == 0:
+        return {"message": "该目录下所有图片已计算完毕", "status": "completed"}
+
+    PHASH_TASKS[folder] = True
+    background_tasks.add_task(_compute_and_save_phash, folder)
+
+    return {
+        "message": "开始计算",
+        "status": "started",
+        "target_image_count": count
+    }
+
+
+def phash_status(
+        folder: str = Query(..., description="一级文件夹"),
+        db: Session = Depends(get_db)
+):
+    remaining_count = db.query(FileRecord).filter(
+        FileRecord.root_folder == folder,
+        FileRecord.file_type == 'image',
+        FileRecord.phash.is_(None),
+        FileRecord.deleted_at == 0
+    ).count()
+
+    return {
+        "folder": folder,
+        "remaining": remaining_count,
+        "is_completed": remaining_count == 0
+    }
+
+
+def find_similar_images(
+        folder: str = Query(..., description="一级文件夹"),
+        distance: int = Query(5, description="汉明距离阈值"),
+        db: Session = Depends(get_db)
+):
+    files = db.query(FileRecord).filter(
+        FileRecord.root_folder == folder,
+        FileRecord.file_type == 'image',
+        FileRecord.phash.isnot(None),
+        FileRecord.deleted_at == 0
+    ).all()
+
+    if not files:
+        return {"message": "没有可比对的图片", "groups": []}
+
+    visited = set()
+    similar_groups = []
+
+    for i, f1 in enumerate(files):
+        if f1.id in visited:
+            continue
+
+        current_group = [f1]
+        visited.add(f1.id)
+
+        try:
+            h1 = imagehash.hex_to_hash(f1.phash)
+        except Exception:
+            continue
+
+        for j in range(i + 1, len(files)):
+            f2 = files[j]
+            if f2.id in visited:
+                continue
+
+            try:
+                h2 = imagehash.hex_to_hash(f2.phash)
+                if h1 - h2 <= distance:
+                    current_group.append(f2)
+                    visited.add(f2.id)
+            except Exception:
+                continue
+
+        if len(current_group) > 1:
+            similar_groups.append(current_group)
+
+    result_groups = []
+    for group in similar_groups:
+        result_groups.append([
+            {c.name: getattr(item, c.name) for c in item.__table__.columns}
+            for item in group
+        ])
+
+    return {
+        "message": f"找到 {len(result_groups)} 组相似图片",
+        "groups": result_groups
+    }
