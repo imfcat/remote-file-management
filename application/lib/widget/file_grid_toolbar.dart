@@ -9,6 +9,8 @@ class FileGridToolbar extends StatelessWidget {
   final bool isDeleting;
   final String sortOption;
   final String groupBy;
+  final bool areAllCollapsed;
+  final VoidCallback onToggleCollapseAll;
   final VoidCallback onCancelSelect;
   final VoidCallback onDelete;
   final VoidCallback onCompare;
@@ -24,6 +26,8 @@ class FileGridToolbar extends StatelessWidget {
     required this.isDeleting,
     required this.sortOption,
     required this.groupBy,
+    required this.areAllCollapsed,
+    required this.onToggleCollapseAll,
     required this.onCancelSelect,
     required this.onDelete,
     required this.onCompare,
@@ -304,6 +308,14 @@ class FileGridToolbar extends StatelessWidget {
               onPressed: () => _showMobileSettingsMenu(context),
             ),
           ],
+
+          // 一键折叠展开按钮
+          if (groupBy != 'none')
+            IconButton(
+              icon: Icon(areAllCollapsed ? Icons.unfold_more : Icons.unfold_less, color: Colors.white),
+              tooltip: areAllCollapsed ? '展开全部分组' : '折叠全部分组',
+              onPressed: onToggleCollapseAll,
+            ),
 
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),

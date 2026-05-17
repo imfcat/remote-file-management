@@ -10,6 +10,13 @@ import 'widget/notification.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initCacheDir();
+
+  // 最大缓存容量
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 1024 * 1024 * 500;
+
+  // 最大缓存图片数
+  PaintingBinding.instance.imageCache.maximumSize = 1000;
+
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(
     MultiProvider(

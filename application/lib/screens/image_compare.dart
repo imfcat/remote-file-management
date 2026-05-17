@@ -50,10 +50,21 @@ class _ImageComparePageState extends State<ImageComparePage> {
   Map<String, dynamic> _leftImageDetail = {}; // 左侧图片详细信息
   Map<String, dynamic> _rightImageDetail = {}; // 右侧图片详细信息
 
+  // 缩放同步
+  final TransformationController _syncTransformationController = TransformationController();
+
   @override
   void initState() {
     super.initState();
     _loadImages();
+  }
+
+  @override
+  void dispose() {
+    // 释放资源
+    _syncTransformationController.dispose();
+    _diffImage?.dispose();
+    super.dispose();
   }
 
   /// 加载图片并转换
@@ -519,6 +530,16 @@ class _ImageComparePageState extends State<ImageComparePage> {
             Padding(
               padding: const EdgeInsets.only(left:12),
               child: IconButton(
+                icon: const Icon(Icons.zoom_out_map, color: Colors.white, size: 20),
+                tooltip: '重置缩放',
+                onPressed: () {
+                  _syncTransformationController.value = Matrix4.identity();
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left:4),
+              child: IconButton(
                 icon: Icon(_showImageInfo ? Icons.info : Icons.info_outline, color: _showImageInfo ? Colors.blueAccent : Colors.white, size:20),
                 tooltip: _showImageInfo ? '隐藏图片信息' : '显示图片信息',
                 onPressed: ()=>setState(()=>_showImageInfo=!_showImageInfo),
@@ -531,16 +552,28 @@ class _ImageComparePageState extends State<ImageComparePage> {
       // 重合对比控制
       return Container(
         color: Colors.grey[900],
-        child: Column(
+        child: Row(
           children: [
-            Slider(
-              value: _sliderValue,
-              min: 0.0,
-              max: 1.0,
-              activeColor: Colors.blueAccent,
-              inactiveColor: Colors.grey[700],
-              label: '左: ${((1 - _sliderValue) * 100).round()}% | 右: ${(_sliderValue * 100).round()}%',
-              onChanged: (value) => setState(() => _sliderValue = value),
+            Expanded(
+              child: Slider(
+                value: _sliderValue,
+                min: 0.0,
+                max: 1.0,
+                activeColor: Colors.blueAccent,
+                inactiveColor: Colors.grey[700],
+                label: '左: ${((1 - _sliderValue) * 100).round()}% | 右: ${(_sliderValue * 100).round()}%',
+                onChanged: (value) => setState(() => _sliderValue = value),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: IconButton(
+                icon: const Icon(Icons.zoom_out_map, color: Colors.white, size: 20),
+                tooltip: '重置缩放',
+                onPressed: () {
+                  _syncTransformationController.value = Matrix4.identity();
+                },
+              ),
             ),
           ],
         ),
@@ -562,19 +595,29 @@ class _ImageComparePageState extends State<ImageComparePage> {
           Expanded(
             child: Stack(
               children: [
-                Image(
-                  image: UiImageProvider(_uiImage1!),
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                ),
-                CustomPaint(
-                  painter: DiffPainter(
-                    diffImage: _diffImage,
-                    highlightColor: _highlightColor,
-                    opacity: _highlightOpacity,
+                InteractiveViewer(
+                  transformationController: _syncTransformationController,
+                  minScale: 0.1,
+                  maxScale: 10.0,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image(
+                        image: UiImageProvider(_uiImage1!),
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
+                      CustomPaint(
+                        painter: DiffPainter(
+                          diffImage: _diffImage,
+                          highlightColor: _highlightColor,
+                          opacity: _highlightOpacity,
+                        ),
+                        size: Size.infinite,
+                      ),
+                    ],
                   ),
-                  size: Size.infinite,
                 ),
                 // 左侧删除按钮
                 Positioned(
@@ -623,19 +666,30 @@ class _ImageComparePageState extends State<ImageComparePage> {
           Expanded(
             child: Stack(
               children: [
-                Image(
-                  image: UiImageProvider(_uiImage2!),
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                ),
-                CustomPaint(
-                  painter: DiffPainter(
-                    diffImage: _diffImage,
-                    highlightColor: _highlightColor,
-                    opacity: _highlightOpacity,
+                // 缩放控制层
+                InteractiveViewer(
+                  transformationController: _syncTransformationController,
+                  minScale: 0.1,
+                  maxScale: 10.0,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image(
+                        image: UiImageProvider(_uiImage2!),
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                        height: double.infinity,
+                      ),
+                      CustomPaint(
+                        painter: DiffPainter(
+                          diffImage: _diffImage,
+                          highlightColor: _highlightColor,
+                          opacity: _highlightOpacity,
+                        ),
+                        size: Size.infinite,
+                      ),
+                    ],
                   ),
-                  size: Size.infinite,
                 ),
                 // 右侧删除按钮
                 Positioned(
@@ -681,29 +735,35 @@ class _ImageComparePageState extends State<ImageComparePage> {
       final leftOpacity = 1 - _sliderValue; // 左图透明度
       final rightOpacity = _sliderValue; // 右图透明度
 
-      return Stack(
-        children: [
-          // 左图-底层
-          Opacity(
-            opacity: leftOpacity,
-            child: Image(
-              image: UiImageProvider(_uiImage1!),
-              fit: BoxFit.contain,
-              width: double.infinity,
-              height: double.infinity,
+      return InteractiveViewer(
+        transformationController: _syncTransformationController,
+        minScale: 0.1,
+        maxScale: 10.0,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 左图-底层
+            Opacity(
+              opacity: leftOpacity,
+              child: Image(
+                image: UiImageProvider(_uiImage1!),
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: double.infinity,
+              ),
             ),
-          ),
-          // 右图-上层
-          Opacity(
-            opacity: rightOpacity,
-            child: Image(
-              image: UiImageProvider(_uiImage2!),
-              fit: BoxFit.contain,
-              width: double.infinity,
-              height: double.infinity,
+            // 右图-上层
+            Opacity(
+              opacity: rightOpacity,
+              child: Image(
+                image: UiImageProvider(_uiImage2!),
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: double.infinity,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
   }

@@ -335,7 +335,7 @@ class _FileGridState extends State<FileGrid> {
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context);
     final crossAxisCount = settings.fileListColumnCount;
-
+    final bool areAllCollapsed = _sortedKeys.isNotEmpty && _collapsedGroups.length == _sortedKeys.length;
     return Column(
       children: [
         FileGridToolbar(
@@ -345,6 +345,16 @@ class _FileGridState extends State<FileGrid> {
           isDeleting: _isDeleting,
           sortOption: '$_sort-$_order',
           groupBy: _groupBy,
+          areAllCollapsed: areAllCollapsed,
+          onToggleCollapseAll: () {
+            setState(() {
+              if (areAllCollapsed) {
+                _collapsedGroups.clear();
+              } else {
+                _collapsedGroups.addAll(_sortedKeys);
+              }
+            });
+          },
           onCancelSelect: _exitSelectMode,
           onDelete: _deleteSelectedFiles,
           onCompare: () async {
