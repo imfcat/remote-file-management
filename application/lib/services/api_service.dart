@@ -69,6 +69,49 @@ class ApiService {
     onRestored?.call();
   }
 
+  static Future<Map<String, dynamic>> calculatePhash(
+      String baseUrl, String folder) async {
+    final uri = Uri.parse('$baseUrl/calculate_phash').replace(queryParameters: {
+      'folder': folder,
+    });
+    final res = await http.post(uri).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('失败: ${res.statusCode}');
+  }
+
+  static Future<Map<String, dynamic>> checkPhashStatus(
+      String baseUrl, String folder) async {
+    final uri = Uri.parse('$baseUrl/phash_status').replace(queryParameters: {
+      'folder': folder,
+    });
+    final res = await getWithTimeout(uri, timeout: _timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('获取计算状态失败');
+  }
+
+  static Future<List<List<FileRecord>>> findSimilarImages(
+      String baseUrl, String folder, int distance) async {
+    final uri = Uri.parse('$baseUrl/find_similar_images').replace(queryParameters: {
+      'folder': folder,
+      'distance': distance.toString(),
+    });
+    final res = await getWithTimeout(uri, timeout: const Duration(seconds: 15));
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      final List<dynamic> groupsData = data['groups'] ?? [];
+
+      List<List<FileRecord>> parsedGroups = [];
+      for (var group in groupsData) {
+        if (group is List) {
+          parsedGroups.add(group.map((e) => FileRecord.fromJson(e)).toList());
+        }
+      }
+      return parsedGroups;
+    }
+    throw Exception('查找相似图片失败: ${res.statusCode}');
+  }
+
   static Future<void> setFolderMark(
       String baseUrl,
       String folder,

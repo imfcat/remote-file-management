@@ -10,6 +10,7 @@ class FileRecord {
   final int? width;
   final int? height;
   final int deletedAt;
+  final String? phash;
 
   FileRecord({
     required this.filePath,
@@ -23,6 +24,7 @@ class FileRecord {
     this.width,
     this.height,
     required this.deletedAt,
+    this.phash,
   });
 
   factory FileRecord.fromJson(Map<String, dynamic> json) => FileRecord(
@@ -37,5 +39,6 @@ class FileRecord {
     width: json['width'],
     height: json['height'],
     deletedAt: json['deleted_at'],
+    phash: json['phash'] as String?,
   );
 }

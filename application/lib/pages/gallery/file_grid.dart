@@ -7,6 +7,7 @@ import '../../services/api_service.dart';
 import '../../utils/backend_provider.dart';
 import '../../utils/settings_provider.dart';
 import '../compare/image_compare.dart';
+import 'widget/duplicate_finder.dart';
 import '../../widget/notification.dart';
 
 import 'file_item.dart';
@@ -106,6 +107,27 @@ class _FileGridState extends State<FileGrid> {
     }
   }
 
+  /// 查找重复项请求
+  void _findDuplicates() {
+    DuplicateFinder.execute(
+      context: context,
+      folder: widget.folder,
+      currentFiles: _files,
+      onLoading: (bool isLoading) {
+        setState(() {
+          _isLoading = isLoading;
+        });
+      },
+      onSuccess: (Map<String, List<FileRecord>> newGroupedFiles, List<String> newSortedKeys) {
+        setState(() {
+          _groupBy = 'duplicate';
+          _groupedFiles = newGroupedFiles;
+          _sortedKeys = newSortedKeys;
+        });
+      },
+    );
+  }
+
   void _processData() {
     // 分组逻辑
     Map<String, List<FileRecord>> tempGroup = {};
@@ -117,11 +139,47 @@ class _FileGridState extends State<FileGrid> {
       for (var f in _files) {
         tempGroup.putIfAbsent(_getGroupFolder(f), () => []).add(f);
       }
+    } else if (_groupBy == 'duplicate') {
+      Map<String, List<FileRecord>> phashGroups = {};
+      List<FileRecord> uniques = [];
+
+      for (var f in _files) {
+        if (f.phash != null && f.phash!.isNotEmpty) {
+          phashGroups.putIfAbsent(f.phash!, () => []).add(f);
+        } else {
+          uniques.add(f);
+        }
+      }
+
+      int groupCounter = 1;
+      for (var entry in phashGroups.entries) {
+        if (entry.value.length > 1) {
+          tempGroup['重复组 $groupCounter'] = entry.value;
+          groupCounter++;
+        } else {
+          uniques.addAll(entry.value);
+        }
+      }
+
+      if (uniques.isNotEmpty) {
+        tempGroup['无重复'] = uniques;
+      }
     } else {
       tempGroup = {'全部': _files};
     }
 
-    var tempKeys = tempGroup.keys.toList()..sort();
+    var tempKeys = tempGroup.keys.toList();
+    if (_groupBy == 'duplicate') {
+      tempKeys.sort((a, b) {
+        if (a == '无重复') return 1;
+        if (b == '无重复') return -1;
+        int numA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        int numB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        return numA.compareTo(numB);
+      });
+    } else {
+      tempKeys.sort();
+    }
 
     setState(() {
       _groupedFiles = tempGroup;
@@ -398,6 +456,7 @@ class _FileGridState extends State<FileGrid> {
             });
             _load();
           },
+          onFindDuplicates: _findDuplicates,
           onGroupByChanged: (val) {
             if (_groupBy != val) {
               setState(() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import '../../utils/settings_provider.dart';
 
 class FileGridToolbar extends StatelessWidget {
@@ -17,6 +18,7 @@ class FileGridToolbar extends StatelessWidget {
   final VoidCallback onRefresh;
   final Function(String) onSortChanged;
   final Function(String) onGroupByChanged;
+  final VoidCallback onFindDuplicates;
 
   const FileGridToolbar({
     super.key,
@@ -34,6 +36,7 @@ class FileGridToolbar extends StatelessWidget {
     required this.onRefresh,
     required this.onSortChanged,
     required this.onGroupByChanged,
+    required this.onFindDuplicates,
   });
 
   // 二级设置菜单
@@ -108,6 +111,7 @@ class FileGridToolbar extends StatelessWidget {
                                 DropdownMenuItem(value: 'none', child: Text('无分组')),
                                 DropdownMenuItem(value: 'type', child: Text('按类型')),
                                 DropdownMenuItem(value: 'folder', child: Text('按目录')),
+                                DropdownMenuItem(value: 'duplicate', child: Text('按重复项')),
                               ],
                               onChanged: (val) {
                                 if (val != null) {
@@ -266,6 +270,13 @@ class FileGridToolbar extends StatelessWidget {
           ),
           const Spacer(),
           if (!isMobile) ...[
+            // 查找重复文件
+            IconButton(
+              icon: const Icon(Symbols.document_search_rounded, color: Colors.white),
+              tooltip: '查找重复图片',
+              onPressed: onFindDuplicates,
+            ),
+            const SizedBox(width: 8),
             // 分组选择
             DropdownButton<String>(
               value: groupBy,
@@ -275,6 +286,7 @@ class FileGridToolbar extends StatelessWidget {
                 DropdownMenuItem(value: 'none', child: Text('无分组')),
                 DropdownMenuItem(value: 'type', child: Text('按类型')),
                 DropdownMenuItem(value: 'folder', child: Text('按目录')),
+                DropdownMenuItem(value: 'duplicate', child: Text('按重复项')),
               ],
               onChanged: (val) {
                 if (val != null) onGroupByChanged(val);
