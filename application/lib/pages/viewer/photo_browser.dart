@@ -1,16 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:nya_image_manage/widget/video_preview.dart';
+import 'package:nya_image_manage/pages/viewer/video_preview.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:provider/provider.dart';
-import '../services/file_record.dart';
-import '../services/file_url.dart';
-import '../services/api_service.dart';
-import '../utils/backend_provider.dart';
-import '../utils/custom_cache.dart';
-import '../utils/settings_provider.dart';
-import 'notification.dart';
+import '../../services/file_record.dart';
+import '../../services/file_url.dart';
+import '../../services/api_service.dart';
+import '../../utils/backend_provider.dart';
+import '../../utils/custom_cache.dart';
+import '../../utils/settings_provider.dart';
+import '../../widget/notification.dart';
 
 class PhotoBrowser extends StatefulWidget {
   final List<FileRecord> files;

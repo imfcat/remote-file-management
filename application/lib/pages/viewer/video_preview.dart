@@ -161,19 +161,40 @@ class _VideoPreviewState extends State<VideoPreview> {
                       _formatDuration(_videoPlayerController!.value.position),
                       style: const TextStyle(color: Colors.white, fontSize: 12),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 4),
                     Expanded(
-                      child: VideoProgressIndicator(
-                        _videoPlayerController!,
-                        allowScrubbing: true,
-                        colors: const VideoProgressColors(
-                          playedColor: Colors.blue,
-                          bufferedColor: Colors.white38,
-                          backgroundColor: Colors.white24,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 6.0,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 8.0,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 24.0,
+                          ),
+                          activeTrackColor: Colors.blue,
+                          inactiveTrackColor: Colors.white24,
+                          thumbColor: Colors.blue,
+                          overlayColor: Colors.blue.withValues(alpha: 0.3),
+                        ),
+                        child: Slider(
+                          value: _videoPlayerController!.value.position.inMilliseconds.toDouble().clamp(
+                            0.0,
+                            _videoPlayerController!.value.duration.inMilliseconds.toDouble() > 0
+                                ? _videoPlayerController!.value.duration.inMilliseconds.toDouble()
+                                : 1.0,
+                          ),
+                          min: 0.0,
+                          max: _videoPlayerController!.value.duration.inMilliseconds.toDouble() > 0
+                              ? _videoPlayerController!.value.duration.inMilliseconds.toDouble()
+                              : 1.0,
+                          onChanged: (value) {
+                            _videoPlayerController!.seekTo(Duration(milliseconds: value.toInt()));
+                          },
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 4),
                     Text(
                       _formatDuration(_videoPlayerController!.value.duration),
                       style: const TextStyle(color: Colors.white, fontSize: 12),
