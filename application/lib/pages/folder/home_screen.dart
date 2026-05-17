@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../utils/backend_provider.dart';
-import '../services/api_service.dart';
-import '../services/folder_record.dart';
-import '../utils/storage_permission.dart';
-import '../widget/folder_grid.dart';
-import '../widget/notification.dart';
-import 'recycle_bin_screen.dart';
-import 'settings_screen.dart';
+import '../../utils/backend_provider.dart';
+import '../../services/api_service.dart';
+import '../../services/folder_record.dart';
+import '../../utils/storage_permission.dart';
+import 'folder_grid.dart';
+import '../../widget/notification.dart';
+import '../recycle/recycle_bin_screen.dart';
+import '../settings/settings_screen.dart';
 
 /// 首页
 class HomeScreen extends StatefulWidget {

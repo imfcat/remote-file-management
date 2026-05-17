@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import '../utils/backend_provider.dart';
-import '../utils/settings_provider.dart';
-import '../services/folder_record.dart';
-import '../screens/file_list_screen.dart';
-import '../services/api_service.dart';
-import 'notification.dart';
+import '../../utils/backend_provider.dart';
+import '../../utils/settings_provider.dart';
+import '../../services/folder_record.dart';
+import '../gallery/file_list_screen.dart';
+import '../../services/api_service.dart';
+import '../../widget/notification.dart';
 
 class FolderGrid extends StatefulWidget {
   final List<Folder> folders;
@@ -81,6 +81,26 @@ class _FolderGridState extends State<FolderGrid> with SingleTickerProviderStateM
   // 显示颜色选择弹窗
   void _showColorPickerDialog(BuildContext context, Folder folder) async {
     Color selectedColor = _parseFolderColor(folder);
+    final List<Color> customColors = [
+      Colors.red,
+      Colors.pink,
+      Colors.purple,
+      Colors.deepPurple,
+      Colors.indigo,
+      Colors.blue,
+      Colors.cyan,
+      Colors.teal,
+      Colors.green,
+      Colors.lightGreen,
+      Colors.lime,
+      Colors.amber,
+      Colors.orange,
+      Colors.deepOrange,
+      Colors.brown,
+      Colors.grey,
+      Colors.blueGrey,
+      Colors.black,
+    ];
 
     await showDialog(
       context: context,
@@ -90,6 +110,7 @@ class _FolderGridState extends State<FolderGrid> with SingleTickerProviderStateM
           content: SingleChildScrollView(
             child: BlockPicker(
               pickerColor: selectedColor,
+              availableColors: customColors,
               onColorChanged: (Color color) async {
                 Navigator.pop(dialogContext);
                 // 颜色转换
