@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:waterfall_flow/waterfall_flow.dart';
 import 'package:provider/provider.dart';
-import 'package:nya_image_manage/widget/photo_browser.dart';
-import '../services/file_record.dart';
-import '../services/api_service.dart';
-import '../utils/backend_provider.dart';
-import '../utils/settings_provider.dart';
-import '../screens/image_compare.dart';
-import 'notification.dart';
+import '../viewer/photo_browser.dart';
+import '../../services/file_record.dart';
+import '../../services/api_service.dart';
+import '../../utils/backend_provider.dart';
+import '../../utils/settings_provider.dart';
+import '../compare/image_compare.dart';
+import '../../widget/notification.dart';
 
 import 'file_item.dart';
 import 'file_grid_toolbar.dart';
 
 class FileGrid extends StatefulWidget {
   final String folder;
-  const FileGrid({super.key, required this.folder});
+  final Function(int totalCount, int totalBytes, String typeSummary)? onFilesUpdated;
+  const FileGrid({
+    super.key,
+    required this.folder,
+    this.onFilesUpdated,
+  });
 
   @override
   State<FileGrid> createState() => _FileGridState();
@@ -65,6 +70,7 @@ class _FileGridState extends State<FileGrid> {
       if (!mounted) return;
       _files = list;
       _processData();
+      _notifyParentUpdated();
     }).catchError((e) {
       if (mounted) {
         setState(() {
@@ -73,6 +79,31 @@ class _FileGridState extends State<FileGrid> {
         AppNotification.show(message: '列表加载失败: $e', type: NotificationType.error, duration: const Duration(seconds: 3));
       }
     });
+  }
+
+  /// 格式化文件类型分组
+  String _getTypeSummary(List<FileRecord> files) {
+    if (files.isEmpty) return "无文件";
+    Map<String, int> typeCounts = {};
+    for (var f in files) {
+      String type = f.mimeType.split('/')[1];
+      if (type.isEmpty) type = 'other';
+      typeCounts[type] = (typeCounts[type] ?? 0) + 1;
+    }
+    return typeCounts.entries.map((e) => "${e.key}/${e.value}").join(", ");
+  }
+
+  /// 计算数据
+  void _notifyParentUpdated() {
+    if (widget.onFilesUpdated != null) {
+      final int totalCount = _files.length;
+      final int totalBytes = _files.fold(0, (sum, item) => sum + item.fileSize);
+      final String typeSummary = _getTypeSummary(_files);
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onFilesUpdated!(totalCount, totalBytes, typeSummary);
+      });
+    }
   }
 
   void _processData() {
@@ -193,6 +224,7 @@ class _FileGridState extends State<FileGrid> {
       if (mounted) {
         setState(() => _isDeleting = false);
       }
+      _notifyParentUpdated();
     }
   }
 
@@ -222,24 +254,6 @@ class _FileGridState extends State<FileGrid> {
     if (_selectedFiles.length != 2) return false;
     final List<FileRecord> files = _selectedFiles.toList();
     return files[0].fileType == 'image' && files[1].fileType == 'image';
-  }
-
-  /// 计算瀑布流Item高度
-  double _calculateItemHeight(BuildContext context, FileRecord f, int crossAxisCount) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final padding = 8.0 * 2;
-    final crossAxisSpacing = 8.0;
-    final availableWidth = screenWidth - padding - (crossAxisCount - 1) * crossAxisSpacing;
-    final itemWidth = availableWidth / crossAxisCount;
-
-    final double imgWidth = f.width?.toDouble() ?? 100.0;
-    final double imgHeight = f.height?.toDouble() ?? 100.0;
-
-    if (f.fileType == 'image') {
-      return itemWidth * (imgHeight / (imgWidth == 0 ? 1.0 : imgWidth));
-    } else {
-      return itemWidth;
-    }
   }
 
   /// 高度计算

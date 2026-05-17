@@ -1,10 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/file_record.dart';
-import '../services/file_url.dart';
-import '../utils/custom_cache.dart';
-import '../utils/settings_provider.dart';
+import '../../services/file_record.dart';
+import '../../services/file_url.dart';
+import '../../utils/custom_cache.dart';
+import '../../utils/settings_provider.dart';
 
 class FileItem extends StatelessWidget {
   final FileRecord file;
