@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:nya_image_manage/screens/test_page.dart';
+import 'package:nya_image_manage/pages/settings/test_page.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
-import '../utils/settings_provider.dart';
-import '../widget/notification.dart';
+import '../../utils/settings_provider.dart';
+import '../../widget/notification.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

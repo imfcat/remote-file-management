@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../utils/backend_provider.dart';
 import '../services/api_service.dart';
 import '../widget/notification.dart';
-import 'home_screen.dart';
+import '../pages/folder/home_screen.dart';
 
 /// 初始化
 class InitScreen extends StatefulWidget {

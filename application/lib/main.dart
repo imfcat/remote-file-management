@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'utils/settings_provider.dart';
 import 'utils/backend_provider.dart';
 import 'utils/custom_cache.dart';
-import 'screens/init_screen.dart';
+import 'screens/init.dart';
 import 'widget/notification.dart';
 
 void main() async {

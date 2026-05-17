@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../widget/notification.dart';
+import '../../widget/notification.dart';
 
 class TestPage extends StatelessWidget {
   const TestPage({super.key});

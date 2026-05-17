@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:waterfall_flow/waterfall_flow.dart';
-import '../services/api_service.dart';
-import '../services/file_record.dart';
-import '../utils/backend_provider.dart';
-import '../utils/settings_provider.dart';
-import '../widget/file_item.dart';
-import '../widget/notification.dart';
+import '../../services/api_service.dart';
+import '../../services/file_record.dart';
+import '../../utils/backend_provider.dart';
+import '../../utils/settings_provider.dart';
+import '../gallery/file_item.dart';
+import '../../widget/notification.dart';
 
 class RecycleBinScreen extends StatefulWidget {
   const RecycleBinScreen({super.key});
