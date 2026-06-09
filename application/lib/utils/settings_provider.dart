@@ -15,6 +15,9 @@ class _StorageKeys {
   static const String showInfoResolution = 'show_info_resolution';
   static const String showInfoIcon = 'show_info_icon';
   static const String showScrollbar = 'show_scrollbar';
+
+  static const String pageSizePure = 'page_size_pure';
+  static const String pageSizeGrouped = 'page_size_grouped';
 }
 
 class SettingsProvider extends ChangeNotifier {
@@ -33,6 +36,9 @@ class SettingsProvider extends ChangeNotifier {
   static const bool _defaultShowIcon = false;
   static const bool _defaultShowScrollbar = true;
 
+  static const int _defaultPageSizePure = -1;
+  static const int _defaultPageSizeGrouped = 500;
+
   // 状态变量
   int _gridColumnCount = _defaultGridColumn;
   bool _clickToggleEnabled = _defaultClickEnabled;
@@ -48,6 +54,9 @@ class SettingsProvider extends ChangeNotifier {
   bool _showInfoIcon = _defaultShowIcon;
   bool _showScrollbar = _defaultShowScrollbar;
 
+  int _pageSizePure = _defaultPageSizePure;
+  int _pageSizeGrouped = _defaultPageSizeGrouped;
+
   //  getter
   int get gridColumnCount => _gridColumnCount;
   bool get clickToggleEnabled => _clickToggleEnabled;
@@ -62,6 +71,9 @@ class SettingsProvider extends ChangeNotifier {
   bool get showInfoResolution => _showInfoResolution;
   bool get showInfoIcon => _showInfoIcon;
   bool get showScrollbar => _showScrollbar;
+
+  int get pageSizePure => _pageSizePure;
+  int get pageSizeGrouped => _pageSizeGrouped;
 
   /// 初始化
   Future<void> init() async {
@@ -85,6 +97,23 @@ class SettingsProvider extends ChangeNotifier {
     _showInfoResolution = prefs.getBool(_StorageKeys.showInfoResolution) ?? _defaultShowResolution;
     _showInfoIcon = prefs.getBool(_StorageKeys.showInfoIcon) ?? _defaultShowIcon;
     _showScrollbar = prefs.getBool(_StorageKeys.showScrollbar) ?? _defaultShowScrollbar;
+
+    _pageSizePure = prefs.getInt(_StorageKeys.pageSizePure) ?? _defaultPageSizePure;
+    _pageSizeGrouped = prefs.getInt(_StorageKeys.pageSizeGrouped) ?? _defaultPageSizeGrouped;
+  }
+
+  /// 设置列表分页大小
+  void setPageSizePure(int value) {
+    _pageSizePure = value;
+    _saveInt(_StorageKeys.pageSizePure, value);
+    notifyListeners();
+  }
+
+  /// 设置分组列表分页大小
+  void setPageSizeGrouped(int value) {
+    _pageSizeGrouped = value;
+    _saveInt(_StorageKeys.pageSizeGrouped, value);
+    notifyListeners();
   }
 
   /// 设置网格列数

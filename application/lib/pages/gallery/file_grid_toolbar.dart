@@ -11,6 +11,8 @@ class FileGridToolbar extends StatelessWidget {
   final String sortOption;
   final String groupBy;
   final bool areAllCollapsed;
+  final int pageSize;
+
   final VoidCallback onToggleCollapseAll;
   final VoidCallback onCancelSelect;
   final VoidCallback onDelete;
@@ -19,6 +21,7 @@ class FileGridToolbar extends StatelessWidget {
   final Function(String) onSortChanged;
   final Function(String) onGroupByChanged;
   final VoidCallback onFindDuplicates;
+  final Function(int) onPageSizeChanged;
 
   const FileGridToolbar({
     super.key,
@@ -29,6 +32,7 @@ class FileGridToolbar extends StatelessWidget {
     required this.sortOption,
     required this.groupBy,
     required this.areAllCollapsed,
+    required this.pageSize,
     required this.onToggleCollapseAll,
     required this.onCancelSelect,
     required this.onDelete,
@@ -37,7 +41,70 @@ class FileGridToolbar extends StatelessWidget {
     required this.onSortChanged,
     required this.onGroupByChanged,
     required this.onFindDuplicates,
+    required this.onPageSizeChanged,
   });
+
+  List<DropdownMenuItem<int>> _buildPageSizeItems(int currentSize) {
+    final List<int> presets = [1, 10, 50, 100, 500, 1000, -1];
+    final List<int> options = List.from(presets);
+
+    if (!options.contains(currentSize) && currentSize > 0) {
+      options.add(currentSize);
+    }
+
+    options.sort((a, b) => a == -1 ? 1 : (b == -1 ? -1 : a.compareTo(b)));
+
+    List<DropdownMenuItem<int>> items = options.map((val) {
+      String label = val == -1 ? '全部' : '$val / 页';
+      if (!presets.contains(val) && val != 0) label = '$val / 页 (自定义)';
+      return DropdownMenuItem(value: val, child: Text(label));
+    }).toList();
+
+    items.add(const DropdownMenuItem(value: 0, child: Text('自定义...')));
+    return items;
+  }
+
+  // 自定义数值输入框
+  void _showCustomPageSizeDialog(BuildContext context, Function(int) onValidSubmit) {
+    final TextEditingController controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('自定义分页大小'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入每页显示的数量',
+          ),
+          onSubmitted: (val) {
+            final parsed = int.tryParse(val);
+            if (parsed != null && parsed > 0) {
+              Navigator.pop(context);
+              onValidSubmit(parsed);
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              final parsed = int.tryParse(controller.text);
+              if (parsed != null && parsed > 0) {
+                Navigator.pop(context);
+                onValidSubmit(parsed);
+              }
+            },
+            child: const Text('确认'),
+          ),
+        ],
+      ),
+    );
+  }
 
   // 二级设置菜单
   void _showMobileSettingsMenu(BuildContext context) {
@@ -50,6 +117,7 @@ class FileGridToolbar extends StatelessWidget {
       builder: (BuildContext sheetContext) {
         String localSort = sortOption;
         String localGroup = groupBy;
+        int localPageSize = pageSize;
 
         return StatefulBuilder(
           builder: (context, setState) {
@@ -147,6 +215,32 @@ class FileGridToolbar extends StatelessWidget {
                                 if (val != null) {
                                   setState(() => localSort = val);
                                   onSortChanged(val);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // 分页设置
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('分页显示', style: TextStyle(color: Colors.white, fontSize: 16)),
+                            DropdownButton<int>(
+                              value: localPageSize,
+                              dropdownColor: Colors.grey[850],
+                              style: const TextStyle(color: Colors.white),
+                              underline: const SizedBox(),
+                              items: _buildPageSizeItems(localPageSize),
+                              onChanged: (val) {
+                                if (val == 0) {
+                                  _showCustomPageSizeDialog(context, (newSize) {
+                                    setState(() => localPageSize = newSize);
+                                    onPageSizeChanged(newSize);
+                                  });
+                                } else if (val != null) {
+                                  setState(() => localPageSize = val);
+                                  onPageSizeChanged(val);
                                 }
                               },
                             ),
@@ -277,11 +371,28 @@ class FileGridToolbar extends StatelessWidget {
               onPressed: onFindDuplicates,
             ),
             const SizedBox(width: 8),
+            // 分页大小选择
+            DropdownButton<int>(
+              value: pageSize,
+              dropdownColor: Colors.grey[850],
+              style: const TextStyle(color: Colors.white),
+              underline: const SizedBox(),
+              items: _buildPageSizeItems(pageSize),
+              onChanged: (val) {
+                if (val == 0) {
+                  _showCustomPageSizeDialog(context, onPageSizeChanged);
+                } else if (val != null) {
+                  onPageSizeChanged(val);
+                }
+              },
+            ),
+            const SizedBox(width: 8),
             // 分组选择
             DropdownButton<String>(
               value: groupBy,
               dropdownColor: Colors.grey[850],
               style: const TextStyle(color: Colors.white),
+              underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 'none', child: Text('无分组')),
                 DropdownMenuItem(value: 'type', child: Text('按类型')),
@@ -298,6 +409,7 @@ class FileGridToolbar extends StatelessWidget {
               value: sortOption,
               dropdownColor: Colors.grey[850],
               style: const TextStyle(color: Colors.white),
+              underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 'path-asc', child: Text('路径 正序')),
                 DropdownMenuItem(value: 'path-desc', child: Text('路径 倒序')),

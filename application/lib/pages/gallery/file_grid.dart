@@ -36,6 +36,9 @@ class _FileGridState extends State<FileGrid> {
   List<String> _sortedKeys = [];
   final Set<String> _collapsedGroups = {};
 
+  // 分页状态
+  int _currentPage = 1;
+
   // 选择模式状态
   bool _isSelecting = false;
   final Set<FileRecord> _selectedFiles = {};
@@ -70,6 +73,7 @@ class _FileGridState extends State<FileGrid> {
     ).then((list) {
       if (!mounted) return;
       _files = list;
+      _currentPage = 1;
       _processData();
       _notifyParentUpdated();
     }).catchError((e) {
@@ -123,6 +127,7 @@ class _FileGridState extends State<FileGrid> {
           _groupBy = 'duplicate';
           _groupedFiles = newGroupedFiles;
           _sortedKeys = newSortedKeys;
+          _currentPage = 1;
         });
       },
     );
@@ -403,11 +408,168 @@ class _FileGridState extends State<FileGrid> {
     );
   }
 
+  /// 更改分页大小逻辑
+  void _handlePageSizeChanged(int newSize, SettingsProvider settings) {
+    if (_groupBy != 'none') {
+      settings.setPageSizeGrouped(newSize);
+    } else {
+      settings.setPageSizePure(newSize);
+    }
+    setState(() => _currentPage = 1);
+  }
+
+  @override
+  /// 构建动态页码控制器
+  Widget _buildPaginationBar(int totalPages) {
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    Set<int> pagesToShow = {};
+    pagesToShow.add(1);
+    pagesToShow.add(totalPages);
+    pagesToShow.add(_currentPage);
+
+    if (_currentPage > 1) pagesToShow.add(_currentPage - 1);
+    if (_currentPage > 2) pagesToShow.add(_currentPage - 2);
+    if (_currentPage > 3) pagesToShow.add(_currentPage - 3);
+    if (_currentPage < totalPages) pagesToShow.add(_currentPage + 1);
+    if (_currentPage < totalPages - 1) pagesToShow.add(_currentPage + 2);
+    if (_currentPage < totalPages - 2) pagesToShow.add(_currentPage + 3);
+
+    List<int> sortedPages = pagesToShow.toList()..sort();
+    List<Widget> pageWidgets = [];
+
+    for (int i = 0; i < sortedPages.length; i++) {
+      int page = sortedPages[i];
+
+      if (i > 0 && page - sortedPages[i - 1] > 1) {
+        pageWidgets.add(
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('...', style: TextStyle(color: Colors.white54, fontSize: 16)),
+            )
+        );
+      }
+
+      final bool isCurrent = page == _currentPage;
+      pageWidgets.add(
+          InkWell(
+            onTap: isCurrent ? null : () {
+              setState(() => _currentPage = page);
+              _scrollController.jumpTo(0);
+            },
+            borderRadius: BorderRadius.circular(4),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              decoration: BoxDecoration(
+                color: isCurrent ? Colors.blueAccent : Colors.transparent,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: isCurrent ? Colors.blueAccent : Colors.white24,
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                '$page',
+                style: TextStyle(
+                  color: isCurrent ? Colors.white : Colors.white70,
+                  fontSize: 14,
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+          )
+      );
+    }
+
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        border: const Border(top: BorderSide(color: Colors.black45, width: 1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 上一页
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            tooltip: '上一页',
+            color: _currentPage > 1 ? Colors.white : Colors.white30,
+            onPressed: _currentPage > 1 ? () {
+              setState(() => _currentPage--);
+              _scrollController.jumpTo(0);
+            } : null,
+          ),
+
+          // 滚动显示的页码按钮排
+          Flexible(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: pageWidgets,
+              ),
+            ),
+          ),
+
+          // 下一页
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            tooltip: '下一页',
+            color: _currentPage < totalPages ? Colors.white : Colors.white30,
+            onPressed: _currentPage < totalPages ? () {
+              setState(() => _currentPage++);
+              _scrollController.jumpTo(0);
+            } : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context);
     final crossAxisCount = settings.fileListColumnCount;
-    final bool areAllCollapsed = _sortedKeys.isNotEmpty && _collapsedGroups.length == _sortedKeys.length;
+
+    // 分页计算
+    final bool isGrouped = _groupBy != 'none';
+    final int pageSize = isGrouped ? settings.pageSizeGrouped : settings.pageSizePure;
+    final int totalItems = isGrouped ? _sortedKeys.length : _files.length;
+    final int totalPages = pageSize <= 0 || totalItems == 0 ? 1 : (totalItems / pageSize).ceil();
+
+    if (_currentPage > totalPages && totalPages > 0) {
+      _currentPage = totalPages;
+    }
+
+    List<String> displayKeys = [];
+    Map<String, List<FileRecord>> displayGroups = {};
+
+    if (!isGrouped) {
+      displayKeys = ['全部'];
+      if (pageSize <= 0) {
+        displayGroups = {'全部': _files};
+      } else {
+        final start = (_currentPage - 1) * pageSize;
+        displayGroups = {'全部': _files.skip(start).take(pageSize).toList()};
+      }
+    } else {
+      if (pageSize <= 0) {
+        displayKeys = _sortedKeys;
+      } else {
+        final start = (_currentPage - 1) * pageSize;
+        displayKeys = _sortedKeys.skip(start).take(pageSize).toList();
+      }
+      displayGroups = _groupedFiles;
+    }
+
+    final bool areAllCollapsed = displayKeys.isNotEmpty &&
+        _collapsedGroups.containsAll(displayKeys) &&
+        displayKeys.length == _collapsedGroups.intersection(displayKeys.toSet()).length;
+
     return Column(
       children: [
         FileGridToolbar(
@@ -418,12 +580,13 @@ class _FileGridState extends State<FileGrid> {
           sortOption: '$_sort-$_order',
           groupBy: _groupBy,
           areAllCollapsed: areAllCollapsed,
+          pageSize: pageSize,
           onToggleCollapseAll: () {
             setState(() {
               if (areAllCollapsed) {
-                _collapsedGroups.clear();
+                _collapsedGroups.removeAll(displayKeys);
               } else {
-                _collapsedGroups.addAll(_sortedKeys);
+                _collapsedGroups.addAll(displayKeys);
               }
             });
           },
@@ -453,6 +616,7 @@ class _FileGridState extends State<FileGrid> {
             setState(() {
               _sort = parts[0];
               _order = parts[1];
+              _currentPage = 1;
             });
             _load();
           },
@@ -462,10 +626,12 @@ class _FileGridState extends State<FileGrid> {
               setState(() {
                 _groupBy = val;
                 _collapsedGroups.clear();
+                _currentPage = 1;
               });
               _processData();
             }
           },
+          onPageSizeChanged: (newSize) => _handlePageSizeChanged(newSize, settings),
         ),
 
         Expanded(
@@ -482,8 +648,8 @@ class _FileGridState extends State<FileGrid> {
               final availableWidth = screenWidth - padding - (crossAxisCount - 1) * crossAxisSpacing;
               final itemWidth = availableWidth / crossAxisCount;
 
-              for (var key in _sortedKeys) {
-                final groupItems = _groupedFiles[key]!;
+              for (var key in displayKeys) {
+                final groupItems = displayGroups[key]!;
                 List<Widget> currentGroupSlivers = [];
 
                 final bool isCollapsed = _collapsedGroups.contains(key);
@@ -599,6 +765,8 @@ class _FileGridState extends State<FileGrid> {
             },
           ),
         ),
+
+        if (!_isLoading) _buildPaginationBar(totalPages),
       ],
     );
   }
