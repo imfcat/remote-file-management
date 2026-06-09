@@ -128,29 +128,61 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     if (confirm != true) return;
     if (!mounted) return;
 
-    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
-    await ApiService.deleteFile(url, f.filePath, onDeleted: () {
-      if (!mounted) return;
-      setState(() {
-        widget.files.remove(f);
-        _hasDeleted = true;
-        if (widget.files.isEmpty) {
-          Navigator.pop(context, true);
-          return;
-        }
+    // 记录原始状态，以便失败时回滚
+    final int originalIndex = widget.files.indexOf(f);
+    if (originalIndex == -1) return;
+
+    setState(() {
+      widget.files.removeAt(originalIndex);
+      _hasDeleted = true;
+
+      if (widget.files.isEmpty) {
+        Navigator.pop(context, true);
+        return;
+      }
         // 根据最后滑动方向计算跳转页码
-        int targetPage;
-        if (_lastDirection == SlideDirection.backward) {
-          targetPage = _current.clamp(0, widget.files.length - 1);
-        } else if (_lastDirection == SlideDirection.forward) {
-          targetPage = (_current - 1).clamp(0, widget.files.length - 1);
-        } else {
-          targetPage = _current.clamp(0, widget.files.length - 1);
+      int targetPage;
+      if (_lastDirection == SlideDirection.backward) {
+        targetPage = _current.clamp(0, widget.files.length - 1);
+      } else if (_lastDirection == SlideDirection.forward) {
+        targetPage = (_current - 1).clamp(0, widget.files.length - 1);
+      } else {
+        targetPage = _current.clamp(0, widget.files.length - 1);
+      }
+      _current = targetPage;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_controller.hasClients) {
+          _controller.jumpToPage(_current);
         }
-        _current = targetPage;
-        _controller.jumpToPage(targetPage);
       });
     });
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+
+    try {
+      await ApiService.deleteFile(url, f.filePath);
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        widget.files.insert(originalIndex, f);
+        _current = originalIndex;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_controller.hasClients) {
+            _controller.jumpToPage(_current);
+          }
+        });
+      });
+
+      AppNotification.show(
+          message: '删除失败: $e',
+          type: NotificationType.error,
+          duration: const Duration(seconds: 3)
+      );
+    }
   }
 
   /// 字节计算
