@@ -3,10 +3,11 @@ import time
 import shutil
 import urllib.parse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from PIL import Image
 import imagehash
 from fastapi import HTTPException, Query, Depends, BackgroundTasks
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database.connection import get_db, SessionLocal
 from database.models import FolderRecord, FileRecord
@@ -14,6 +15,10 @@ from core.config import config
 from core.logger import info, error
 
 PHASH_TASKS = {}
+
+
+class DeleteFilesRequest(BaseModel):
+    file_paths: List[str]
 
 def list_root_folders(db: Session = Depends(get_db)):
     query = db.query(FolderRecord)
@@ -65,10 +70,7 @@ def list_files(
     return {"files": [f.__dict__ for f in files]}
 
 
-def delete_file(
-        file_path: str,
-        db: Session = Depends(get_db)
-):
+def _delete_single_file(file_path: str, db: Session) -> dict:
     if not config.is_recycle_folder:
         print(f"'.recycle' 目录不存在，无法安全删除文件")
 
@@ -77,10 +79,8 @@ def delete_file(
 
     if not src.exists():
         db.query(FileRecord).filter(FileRecord.file_path == file_path).update({"deleted_at": int(time.time())})
-        db.commit()
         return {"message": "文件已不存在，仅在数据库中标记为已删除"}
 
-    # 构造回收站路径
     root_folder = src.relative_to(config.root_dir).parts[0]
     rel_path = src.relative_to(Path(config.root_dir) / root_folder)
 
@@ -88,19 +88,13 @@ def delete_file(
     recycle_dir.mkdir(parents=True, exist_ok=True)
     dst = recycle_dir / src.name
 
-    try:
-        shutil.move(str(src), str(dst))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"移动失败: {e}")
+    shutil.move(str(src), str(dst))
 
-    # 查询FileRecord记录，获取root_folder
     file_record = db.query(FileRecord).filter(FileRecord.file_path == file_path).first()
     if file_record:
-        # 更新删除时间戳
         file_record.deleted_at = int(time.time())
         db_root_folder = file_record.root_folder
 
-        # 更新count
         if db_root_folder:
             folder_record = db.query(FolderRecord).filter(FolderRecord.folder == db_root_folder).first()
             if folder_record:
@@ -108,8 +102,53 @@ def delete_file(
                 if folder_record.count < 0:
                     folder_record.count = 0
 
-    db.commit()
-    return {"message": "已移入回收站", "recycle_path": str(dst)}
+    result = {"message": "已移入回收站", "recycle_path": str(dst)}
+    return result
+
+
+def delete_files(
+        body: DeleteFilesRequest,
+        db: Session = Depends(get_db)
+):
+    if not body.file_paths:
+        return {
+            "message": "无文件需要删除",
+            "total": 0,
+            "success_count": 0,
+            "failed_count": 0,
+            "results": [],
+        }
+
+    results = []
+    success_count = 0
+    failed_count = 0
+
+    for raw_path in body.file_paths:
+        try:
+            result = _delete_single_file(raw_path, db)
+            db.commit()
+            success_count += 1
+            results.append({
+                "file_path": urllib.parse.unquote(raw_path),
+                "success": True,
+                **result,
+            })
+        except Exception as e:
+            db.rollback()
+            failed_count += 1
+            results.append({
+                "file_path": urllib.parse.unquote(raw_path),
+                "success": False,
+                "message": str(e),
+            })
+
+    return {
+        "message": f"批量删除完成，成功 {success_count} 个，失败 {failed_count} 个",
+        "total": len(body.file_paths),
+        "success_count": success_count,
+        "failed_count": failed_count,
+        "results": results,
+    }
 
 
 # 移出回收站
