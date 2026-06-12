@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../viewer/photo_browser.dart';
 import '../../services/file_record.dart';
 import '../../services/api_service.dart';
+import '../../services/file_delete_service.dart';
 import '../../utils/backend_provider.dart';
 import '../../utils/settings_provider.dart';
 import '../compare/image_compare.dart';
@@ -43,7 +44,17 @@ class _FileGridState extends State<FileGrid> {
   bool _isSelecting = false;
   final Set<FileRecord> _selectedFiles = {};
   bool _isDeleting = false;
+  int _deleteOpGeneration = 0;
   final ScrollController _scrollController = ScrollController();
+
+  // 滚动显隐顶栏/底栏
+  static const double _scrollHideThreshold = 56.0;
+  static const double _edgeThreshold = 8.0;
+  double _lastScrollOffset = 0;
+  bool _chromeHidden = false;
+  bool _showTopBar = true;
+  bool _showBottomBar = true;
+  bool _toolbarCompact = false;
 
   @override
   void dispose() {
@@ -54,7 +65,79 @@ class _FileGridState extends State<FileGrid> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _load();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+
+    final position = _scrollController.position;
+    final offset = position.pixels;
+    final maxExtent = position.maxScrollExtent;
+    final delta = offset - _lastScrollOffset;
+
+    final atTop = offset <= _edgeThreshold;
+    final atBottom = maxExtent <= _edgeThreshold || (maxExtent - offset) <= _edgeThreshold;
+
+    var chromeHidden = _chromeHidden;
+    if (atTop) {
+      chromeHidden = false;
+    } else if (delta > _scrollHideThreshold) {
+      chromeHidden = true;
+    } else if (delta < -_scrollHideThreshold) {
+      chromeHidden = false;
+    }
+
+    final showTop = !chromeHidden || _isSelecting;
+    final showBottom = !chromeHidden || atBottom;
+    final compact = _isSelecting && chromeHidden;
+
+    _lastScrollOffset = offset;
+
+    if (chromeHidden != _chromeHidden ||
+        showTop != _showTopBar ||
+        showBottom != _showBottomBar ||
+        compact != _toolbarCompact) {
+      setState(() {
+        _chromeHidden = chromeHidden;
+        _showTopBar = showTop;
+        _showBottomBar = showBottom;
+        _toolbarCompact = compact;
+      });
+    }
+  }
+
+  void _resetScrollChrome() {
+    _lastScrollOffset = 0;
+    setState(() {
+      _chromeHidden = false;
+      _showTopBar = true;
+      _showBottomBar = true;
+      _toolbarCompact = false;
+    });
+  }
+
+  void _syncChromeAfterSelectionChange() {
+    if (!_scrollController.hasClients) {
+      setState(() {
+        _showTopBar = true;
+        _toolbarCompact = false;
+      });
+      return;
+    }
+
+    final offset = _scrollController.offset;
+    final maxExtent = _scrollController.position.maxScrollExtent;
+    final atTop = offset <= _edgeThreshold;
+    final atBottom = maxExtent <= _edgeThreshold || (maxExtent - offset) <= _edgeThreshold;
+
+    setState(() {
+      if (atTop) _chromeHidden = false;
+      _showTopBar = !_chromeHidden || _isSelecting;
+      _showBottomBar = !_chromeHidden || atBottom;
+      _toolbarCompact = _isSelecting && _chromeHidden;
+    });
   }
 
   void _load({bool silent = false}) {
@@ -224,6 +307,99 @@ class _FileGridState extends State<FileGrid> {
     return result ?? false;
   }
 
+  /// 统一删除
+  Future<FileDeleteResult> _deleteFiles(
+    List<FileRecord> targets, {
+    bool resetToFirstPage = false,
+  }) async {
+    if (_isDeleting) {
+      return FileDeleteResult(
+        currentFiles: _files,
+        deletedPaths: const {},
+        failedPaths: const {},
+        verified: false,
+        message: '正在删除中，请稍候',
+      );
+    }
+
+    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+
+    List<FileRecord> validated;
+    try {
+      validated = FileDeleteService.validateTargets(_files, targets);
+    } catch (e) {
+      AppNotification.show(
+        message: e.toString(),
+        type: NotificationType.error,
+        duration: const Duration(seconds: 3),
+      );
+      return FileDeleteResult(
+        currentFiles: _files,
+        deletedPaths: const {},
+        failedPaths: const {},
+        verified: false,
+        message: e.toString(),
+      );
+    }
+
+    final pathsToDelete = validated.map((f) => f.filePath).toList();
+    final pathSet = pathsToDelete.toSet();
+    final snapshot = List<FileRecord>.from(_files);
+    final optimistic = FileDeleteService.removeByPaths(_files, pathSet);
+    final opGen = ++_deleteOpGeneration;
+
+    setState(() {
+      _isDeleting = true;
+      _files = optimistic;
+      _selectedFiles.removeWhere((f) => pathSet.contains(f.filePath));
+      if (_selectedFiles.isEmpty) _isSelecting = false;
+      if (resetToFirstPage) {
+        _currentPage = 1;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_scrollController.hasClients) _scrollController.jumpTo(0);
+          _resetScrollChrome();
+        });
+      }
+    });
+    _processData();
+    _notifyParentUpdated();
+
+    final result = await FileDeleteService.confirmDeletion(
+      baseUrl: url,
+      folder: widget.folder,
+      sort: _sort,
+      order: _order,
+      snapshotBeforeDelete: snapshot,
+      optimisticList: optimistic,
+      pathsToDelete: pathsToDelete,
+    );
+
+    if (!mounted || opGen != _deleteOpGeneration) return result;
+
+    setState(() {
+      _isDeleting = false;
+      _files = result.currentFiles;
+    });
+    _processData();
+    _notifyParentUpdated();
+
+    if (result.verified) {
+      AppNotification.show(
+        message: result.message,
+        type: NotificationType.success,
+        duration: const Duration(seconds: 2),
+      );
+    } else {
+      AppNotification.show(
+        message: result.message,
+        type: NotificationType.error,
+        duration: const Duration(seconds: 3),
+      );
+    }
+
+    return result;
+  }
+
   /// 批量删除选中文件
   Future<void> _deleteSelectedFiles() async {
     if (_selectedFiles.isEmpty || _isDeleting) return;
@@ -237,58 +413,8 @@ class _FileGridState extends State<FileGrid> {
     if (!confirm) return;
     if (!mounted) return;
 
-    setState(() {
-      _isDeleting = true;
-    });
-
-    if (mounted) {
-      AppNotification.show(
-        message: '正在删除 $selectedCount 个文件...',
-        type: NotificationType.info,
-        duration: const Duration(seconds: 10),
-      );
-    }
-
-    try {
-      final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
-
-      final filesToDelete = _selectedFiles.toList();
-      List<String> failedFiles = [];
-      int successCount = 0;
-      for (var file in filesToDelete) {
-        try {
-          await ApiService.deleteFile(url, file.filePath);
-          _files.remove(file);
-          successCount++;
-        } catch (innerE) {
-          debugPrint('文件 ${file.fileName} 删除失败: $innerE');
-          failedFiles.add(file.fileName);
-        }
-      }
-
-      if (mounted) {
-        if (failedFiles.isEmpty) {
-          AppNotification.show(message: '成功删除$successCount个文件', type: NotificationType.warning, duration: const Duration(seconds: 2));
-        } else {
-          AppNotification.show(
-              message: '删除了$successCount个文件，但有${failedFiles.length}个失败',
-              type: NotificationType.error,
-              duration: const Duration(seconds: 4)
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        AppNotification.show(message: '批量删除遇到错误：$e', type: NotificationType.error, duration: const Duration(seconds: 3));
-      }
-    } finally {
-      _exitSelectMode();
-      _processData();
-      if (mounted) {
-        setState(() => _isDeleting = false);
-      }
-      _notifyParentUpdated();
-    }
+    await _deleteFiles(_selectedFiles.toList());
+    _exitSelectMode();
   }
 
   /// 退出选择模式
@@ -297,6 +423,7 @@ class _FileGridState extends State<FileGrid> {
       _isSelecting = false;
       _selectedFiles.clear();
     });
+    _syncChromeAfterSelectionChange();
   }
 
   /// 切换文件选中状态
@@ -304,12 +431,12 @@ class _FileGridState extends State<FileGrid> {
     setState(() {
       if (_selectedFiles.contains(file)) {
         _selectedFiles.remove(file);
-        // 如果取消后没有选中项，退出选择模式
         if (_selectedFiles.isEmpty) _isSelecting = false;
       } else {
         _selectedFiles.add(file);
       }
     });
+    _syncChromeAfterSelectionChange();
   }
 
   /// 判断是否选中了两张图片
@@ -336,33 +463,26 @@ class _FileGridState extends State<FileGrid> {
     } else {
       List<FileRecord> displayFiles = [];
       if (_groupBy == 'none') {
-        displayFiles = _files;
+        displayFiles = List<FileRecord>.from(_files);
       } else {
         for (var key in _sortedKeys) {
           displayFiles.addAll(_groupedFiles[key]!);
         }
       }
 
-      final currentIndex = displayFiles.indexOf(f);
-      final originalLength = displayFiles.length;
+      final currentIndex = displayFiles.indexWhere((item) => item.filePath == f.filePath);
+      if (currentIndex == -1) return;
 
-      final deleted = await Navigator.push<bool>(
+      await Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => PhotoBrowser(
-            files: displayFiles,
+            files: List<FileRecord>.from(displayFiles),
             initialIndex: currentIndex,
+            onDeleteFiles: _deleteFiles,
           ),
         ),
       );
-
-      if (deleted == true || displayFiles.length != originalLength) {
-        if (_groupBy != 'none') {
-          _files.removeWhere((item) => !displayFiles.contains(item));
-        }
-
-        reload(silent: true);
-      }
     }
   }
 
@@ -397,6 +517,7 @@ class _FileGridState extends State<FileGrid> {
           _isSelecting = true;
           _selectedFiles.add(f);
         });
+        _syncChromeAfterSelectionChange();
       },
       child: FileItem(
         file: f,
@@ -416,9 +537,114 @@ class _FileGridState extends State<FileGrid> {
       settings.setPageSizePure(newSize);
     }
     setState(() => _currentPage = 1);
+    _resetScrollChrome();
   }
 
-  @override
+  Widget _buildToolbar({
+    required bool areAllCollapsed,
+    required int pageSize,
+    required List<String> displayKeys,
+    required SettingsProvider settings,
+  }) {
+    return FileGridToolbar(
+      compact: _toolbarCompact,
+      isSelecting: _isSelecting,
+      selectedCount: _selectedFiles.length,
+      showCompareButton: _isTwoImagesSelected(),
+      isDeleting: _isDeleting,
+      sortOption: '$_sort-$_order',
+      groupBy: _groupBy,
+      areAllCollapsed: areAllCollapsed,
+      pageSize: pageSize,
+      onToggleCollapseAll: () {
+        setState(() {
+          if (areAllCollapsed) {
+            _collapsedGroups.removeAll(displayKeys);
+          } else {
+            _collapsedGroups.addAll(displayKeys);
+          }
+        });
+      },
+      onCancelSelect: _exitSelectMode,
+      onDelete: _deleteSelectedFiles,
+      onCompare: () async {
+        final selectedImages = _selectedFiles.toList();
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ImageComparePage(
+              image1: selectedImages[0],
+              image2: selectedImages[1],
+              onDeleteFiles: _deleteFiles,
+            ),
+          ),
+        );
+        _exitSelectMode();
+      },
+      onRefresh: () => reload(silent: true),
+      onSortChanged: (val) {
+        final parts = val.split('-');
+        setState(() {
+          _sort = parts[0];
+          _order = parts[1];
+          _currentPage = 1;
+        });
+        _load();
+      },
+      onFindDuplicates: _findDuplicates,
+      onGroupByChanged: (val) {
+        if (_groupBy != val) {
+          setState(() {
+            _groupBy = val;
+            _collapsedGroups.clear();
+            _currentPage = 1;
+          });
+          _processData();
+        }
+      },
+      onPageSizeChanged: (newSize) => _handlePageSizeChanged(newSize, settings),
+    );
+  }
+
+  Widget _buildAnimatedTopBar(Widget toolbar) {
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      offset: _showTopBar ? Offset.zero : const Offset(0, -1),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 180),
+        opacity: _showTopBar ? 1 : 0,
+        child: IgnorePointer(
+          ignoring: !_showTopBar,
+          child: Material(
+            elevation: 4,
+            color: Colors.transparent,
+            child: toolbar,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedBottomBar(Widget paginationBar) {
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      offset: _showBottomBar ? Offset.zero : const Offset(0, 1),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 180),
+        opacity: _showBottomBar ? 1 : 0,
+        child: IgnorePointer(
+          ignoring: !_showBottomBar,
+          child: Material(
+            elevation: 4,
+            color: Colors.transparent,
+            child: paginationBar,
+          ),
+        ),
+      ),
+    );
+  }
   /// 构建动态页码控制器
   Widget _buildPaginationBar(int totalPages) {
     if (totalPages <= 1) return const SizedBox.shrink();
@@ -456,6 +682,7 @@ class _FileGridState extends State<FileGrid> {
             onTap: isCurrent ? null : () {
               setState(() => _currentPage = page);
               _scrollController.jumpTo(0);
+              _resetScrollChrome();
             },
             borderRadius: BorderRadius.circular(4),
             child: AnimatedContainer(
@@ -500,6 +727,7 @@ class _FileGridState extends State<FileGrid> {
             onPressed: _currentPage > 1 ? () {
               setState(() => _currentPage--);
               _scrollController.jumpTo(0);
+              _resetScrollChrome();
             } : null,
           ),
 
@@ -523,6 +751,7 @@ class _FileGridState extends State<FileGrid> {
             onPressed: _currentPage < totalPages ? () {
               setState(() => _currentPage++);
               _scrollController.jumpTo(0);
+              _resetScrollChrome();
             } : null,
           ),
         ],
@@ -570,78 +799,23 @@ class _FileGridState extends State<FileGrid> {
         _collapsedGroups.containsAll(displayKeys) &&
         displayKeys.length == _collapsedGroups.intersection(displayKeys.toSet()).length;
 
-    return Column(
-      children: [
-        FileGridToolbar(
-          isSelecting: _isSelecting,
-          selectedCount: _selectedFiles.length,
-          showCompareButton: _isTwoImagesSelected(),
-          isDeleting: _isDeleting,
-          sortOption: '$_sort-$_order',
-          groupBy: _groupBy,
-          areAllCollapsed: areAllCollapsed,
-          pageSize: pageSize,
-          onToggleCollapseAll: () {
-            setState(() {
-              if (areAllCollapsed) {
-                _collapsedGroups.removeAll(displayKeys);
-              } else {
-                _collapsedGroups.addAll(displayKeys);
-              }
-            });
-          },
-          onCancelSelect: _exitSelectMode,
-          onDelete: _deleteSelectedFiles,
-          onCompare: () async {
-            final selectedImages = _selectedFiles.toList();
-            final deleted = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ImageComparePage(
-                  image1: selectedImages[0],
-                  image2: selectedImages[1],
-                  backendUrl: Provider.of<BackendProvider>(context, listen: false).backendUrl!,
-                ),
-              ),
-            );
-            if (deleted == true) {
-              reload(silent: true);
-            } else {
-              _exitSelectMode();
-            }
-          },
-          onRefresh: () => reload(silent: true),
-          onSortChanged: (val) {
-            final parts = val.split('-');
-            setState(() {
-              _sort = parts[0];
-              _order = parts[1];
-              _currentPage = 1;
-            });
-            _load();
-          },
-          onFindDuplicates: _findDuplicates,
-          onGroupByChanged: (val) {
-            if (_groupBy != val) {
-              setState(() {
-                _groupBy = val;
-                _collapsedGroups.clear();
-                _currentPage = 1;
-              });
-              _processData();
-            }
-          },
-          onPageSizeChanged: (newSize) => _handlePageSizeChanged(newSize, settings),
-        ),
+    final toolbar = _buildToolbar(
+      areAllCollapsed: areAllCollapsed,
+      pageSize: pageSize,
+      displayKeys: displayKeys,
+      settings: settings,
+    );
+    final paginationBar = _buildPaginationBar(totalPages);
 
-        Expanded(
+    return Stack(
+      children: [
+        Positioned.fill(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : Builder(
             builder: (context) {
               List<Widget> slivers = [];
 
-              // 预计算每个item宽度
               final screenWidth = MediaQuery.of(context).size.width;
               final padding = 8.0 * 2;
               final crossAxisSpacing = 8.0;
@@ -694,7 +868,6 @@ class _FileGridState extends State<FileGrid> {
                 }
 
                 if (_groupBy == 'none' || !isCollapsed) {
-                  // 添加网格或瀑布流列表
                   if (!settings.isWaterfallFlow) {
                     currentGroupSlivers.add(
                       SliverPadding(
@@ -766,7 +939,20 @@ class _FileGridState extends State<FileGrid> {
           ),
         ),
 
-        if (!_isLoading) _buildPaginationBar(totalPages),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: _buildAnimatedTopBar(toolbar),
+        ),
+
+        if (!_isLoading && totalPages > 1)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildAnimatedBottomBar(paginationBar),
+          ),
       ],
     );
   }

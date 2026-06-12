@@ -5,9 +5,8 @@ import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:provider/provider.dart';
 import '../../services/file_record.dart';
+import '../../services/file_delete_service.dart';
 import '../../services/file_url.dart';
-import '../../services/api_service.dart';
-import '../../utils/backend_provider.dart';
 import '../../utils/custom_cache.dart';
 import '../../utils/settings_provider.dart';
 import '../../widget/notification.dart';
@@ -15,7 +14,14 @@ import '../../widget/notification.dart';
 class PhotoBrowser extends StatefulWidget {
   final List<FileRecord> files;
   final int initialIndex;
-  const PhotoBrowser({super.key, required this.files, required this.initialIndex});
+  final FileDeleteHandler onDeleteFiles;
+
+  const PhotoBrowser({
+    super.key,
+    required this.files,
+    required this.initialIndex,
+    required this.onDeleteFiles,
+  });
 
   @override
   State<PhotoBrowser> createState() => _PhotoBrowserState();
@@ -29,6 +35,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
   bool _uiVisible = true;
   bool _hasDeleted = false;
   bool _showOriginal = false;
+  bool _isDeleting = false;
   SlideDirection _lastDirection = SlideDirection.none;
 
   @override
@@ -43,18 +50,14 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     final List<int> cacheOrder = [current];
     final total = widget.files.length;
 
-    // 缓存后n张
     for (int i = 1; i <= 3; i++) {
       if (current + i < total) cacheOrder.add(current + i);
     }
-    // 缓存前n张
     for (int i = 1; i <= 3; i++) {
       if (current - i >= 0) cacheOrder.add(current - i);
     }
-    // 执行缓存操作
     for (final index in cacheOrder) {
       final url = mediumUrl(context, widget.files[index].file);
-      // 检查是否已缓存
       final fileInfo = await customCacheManager().getFileFromCache(url);
       if (fileInfo == null) {
         customCacheManager().getFileStream(url);
@@ -64,8 +67,54 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
 
   void _toggleUi() => setState(() => _uiVisible = !_uiVisible);
 
+  int _indexOfPath(String path) =>
+      widget.files.indexWhere((item) => item.filePath == path);
+
+  void _applyLocalRemove(int originalIndex) {
+    setState(() {
+      widget.files.removeAt(originalIndex);
+      _hasDeleted = true;
+
+      if (widget.files.isEmpty) {
+        return;
+      }
+
+      int targetPage;
+      if (_lastDirection == SlideDirection.backward) {
+        targetPage = _current.clamp(0, widget.files.length - 1);
+      } else if (_lastDirection == SlideDirection.forward) {
+        targetPage = (_current - 1).clamp(0, widget.files.length - 1);
+      } else {
+        targetPage = _current.clamp(0, widget.files.length - 1);
+      }
+      _current = targetPage;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_controller.hasClients) {
+          _controller.jumpToPage(_current);
+        }
+      });
+    });
+  }
+
+  void _rollbackLocalInsert(int originalIndex, FileRecord file) {
+    setState(() {
+      final insertIndex = originalIndex.clamp(0, widget.files.length);
+      widget.files.insert(insertIndex, file);
+      _current = insertIndex;
+      _hasDeleted = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_controller.hasClients) {
+          _controller.jumpToPage(_current);
+        }
+      });
+    });
+  }
+
   /// 二次确认删除
   Future<void> _deleteFile(FileRecord f) async {
+    if (_isDeleting) return;
+
     final bool? confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -128,71 +177,43 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
     if (confirm != true) return;
     if (!mounted) return;
 
-    // 记录原始状态，以便失败时回滚
-    final int originalIndex = widget.files.indexOf(f);
+    final path = f.filePath;
+    final originalIndex = _indexOfPath(path);
     if (originalIndex == -1) return;
 
-    setState(() {
-      widget.files.removeAt(originalIndex);
-      _hasDeleted = true;
+    setState(() => _isDeleting = true);
+    _applyLocalRemove(originalIndex);
 
-      if (widget.files.isEmpty) {
-        Navigator.pop(context, true);
-        return;
-      }
-        // 根据最后滑动方向计算跳转页码
-      int targetPage;
-      if (_lastDirection == SlideDirection.backward) {
-        targetPage = _current.clamp(0, widget.files.length - 1);
-      } else if (_lastDirection == SlideDirection.forward) {
-        targetPage = (_current - 1).clamp(0, widget.files.length - 1);
-      } else {
-        targetPage = _current.clamp(0, widget.files.length - 1);
-      }
-      _current = targetPage;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_controller.hasClients) {
-          _controller.jumpToPage(_current);
-        }
-      });
-    });
-
-    await Future.delayed(const Duration(milliseconds: 300));
+    final result = await widget.onDeleteFiles([f]);
     if (!mounted) return;
-    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
 
-    try {
-      await ApiService.deleteFile(url, f.filePath);
-    } catch (e) {
-      if (!mounted) return;
+    setState(() => _isDeleting = false);
 
-      setState(() {
-        widget.files.insert(originalIndex, f);
-        _current = originalIndex;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_controller.hasClients) {
-            _controller.jumpToPage(_current);
-          }
-        });
-      });
+    if (!result.deletedPaths.contains(path)) {
+      if (widget.files.isEmpty || _indexOfPath(path) == -1) {
+        _rollbackLocalInsert(originalIndex, f);
+      }
+      return;
+    }
 
-      AppNotification.show(
-          message: '删除失败: $e',
-          type: NotificationType.error,
-          duration: const Duration(seconds: 3)
-      );
+    if (!result.verified) {
+      final serverPaths = FileDeleteService.pathsOf(result.currentFiles);
+      if (serverPaths.contains(path) && _indexOfPath(path) == -1) {
+        _rollbackLocalInsert(originalIndex, f);
+      }
+    }
+
+    if (widget.files.isEmpty && mounted) {
+      Navigator.pop(context, true);
     }
   }
 
-  /// 字节计算
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '${bytes}B';
     if (bytes < 1048576) return '${(bytes / 1024).toStringAsFixed(1)}KB';
     return '${(bytes / 1048576).toStringAsFixed(1)}MB';
   }
 
-  // 切换原图
   void _toggleOriginalWithSnackBar() {
     setState(() {
       _showOriginal = !_showOriginal;
@@ -202,6 +223,13 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.files.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.shrink(),
+      );
+    }
+
     final total = widget.files.length;
     final cf = widget.files[_current];
     final shadows = <Shadow>[
@@ -212,7 +240,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       ),
     ];
 
-    // 切换到上一页
     void prevPage() {
       if (_current > 0) {
         setState(() {
@@ -228,7 +255,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       }
     }
 
-    // 切换到下一页
     void nextPage() {
       if (_current < total - 1) {
         setState(() {
@@ -244,7 +270,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       }
     }
 
-    // 监听设置状态
     final settings = Provider.of<SettingsProvider>(context);
     final clickToggleEnabled = settings.clickToggleEnabled;
     final clickAreaSize = settings.clickAreaSize;
@@ -261,7 +286,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               itemCount: total,
               pageController: _controller,
               onPageChanged: (i) {
-                // 判断滑动方向
                 if (i > _current) {
                   _lastDirection = SlideDirection.backward;
                 } else if (i < _current) {
@@ -272,7 +296,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               },
               builder: (_, index) {
                 final f = widget.files[index];
-                // 图片
                 if (f.fileType == 'image') {
                   final url = f.mimeType == 'image/gif'
                       ? fileContentUrl(context, f.file)
@@ -289,7 +312,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                   );
                 }
 
-                // 视频
                 final url = fileContentUrl(context, f.file);
                 return PhotoViewGalleryPageOptions.customChild(
                   child: VideoPreview(
@@ -304,7 +326,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               backgroundDecoration: const BoxDecoration(color: Colors.black),
             ),
           ),
-          // 上一页
           if (clickToggleEnabled)
             Positioned(
               left: 0,
@@ -316,8 +337,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                 onTap: prevPage,
               ),
             ),
-
-            // 下一页
           if (clickToggleEnabled)
             Positioned(
               right: 0,
@@ -329,7 +348,6 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                 onTap: nextPage,
               ),
             ),
-
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
@@ -377,12 +395,10 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                         style: TextStyle(color: Colors.white70, fontSize: 14, shadows: shadows),
                       ),
                       const SizedBox(width: 8),
-                      // 信息弹窗按钮
                       IconButton(
                         icon: Icon(Icons.info_outline, color: Colors.white, shadows: shadows),
                         onPressed: () => _showInfo(context, cf),
                       ),
-                      // 原图切换按钮
                       if (!(cf.fileType == 'video' || cf.mimeType == 'image/gif'))
                       IconButton(
                         icon: Icon(
@@ -391,10 +407,9 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                         ),
                         onPressed: _toggleOriginalWithSnackBar,
                       ),
-                      // 删除按钮
                       IconButton(
                         icon: Icon(Icons.delete, color: Colors.white, shadows: shadows),
-                        onPressed: () => _deleteFile(cf),
+                        onPressed: _isDeleting ? null : () => _deleteFile(cf),
                       ),
                     ],
                   ),

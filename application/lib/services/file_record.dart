@@ -41,4 +41,12 @@ class FileRecord {
     deletedAt: json['deleted_at'],
     phash: json['phash'] as String?,
   );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FileRecord && filePath == other.filePath;
+
+  @override
+  int get hashCode => filePath.hashCode;
 }

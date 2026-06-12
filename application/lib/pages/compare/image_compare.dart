@@ -8,8 +8,8 @@ import 'package:image/image.dart' as img;
 
 import '../../services/file_url.dart';
 import '../../services/file_record.dart';
+import '../../services/file_delete_service.dart';
 import '../../utils/custom_cache.dart';
-import '../../services/api_service.dart';
 import '../../widget/notification.dart';
 
 import 'compare_utils.dart';
@@ -20,13 +20,13 @@ import 'overlay_view.dart';
 class ImageComparePage extends StatefulWidget {
   final FileRecord image1;
   final FileRecord image2;
-  final String backendUrl;
+  final FileDeleteHandler onDeleteFiles;
 
   const ImageComparePage({
     super.key,
     required this.image1,
     required this.image2,
-    required this.backendUrl,
+    required this.onDeleteFiles,
   });
 
   @override
@@ -253,14 +253,11 @@ class _ImageComparePageState extends State<ImageComparePage> {
     if (_isDeletingLeft) return;
     setState(() => _isDeletingLeft = true);
     try {
-      await ApiService.deleteFile(widget.backendUrl, widget.image1.filePath, onDeleted: () {
-        if (mounted) {
-          AppNotification.show(message: '左侧图片删除成功', type: NotificationType.warning, duration: const Duration(seconds: 1));
-          Navigator.pop(context, true);
-        }
-      });
-    } catch (e) {
-      if (mounted) AppNotification.show(message: '左侧图片删除失败：$e', type: NotificationType.error, duration: const Duration(seconds: 3));
+      final result = await widget.onDeleteFiles([widget.image1]);
+      if (!mounted) return;
+      if (result.deletedPaths.contains(widget.image1.filePath)) {
+        Navigator.pop(context, true);
+      }
     } finally {
       if (mounted) setState(() => _isDeletingLeft = false);
     }
@@ -270,14 +267,11 @@ class _ImageComparePageState extends State<ImageComparePage> {
     if (_isDeletingRight) return;
     setState(() => _isDeletingRight = true);
     try {
-      await ApiService.deleteFile(widget.backendUrl, widget.image2.filePath, onDeleted: () {
-        if (mounted) {
-          AppNotification.show(message: '右侧图片删除成功', type: NotificationType.warning, duration: const Duration(seconds: 1));
-          Navigator.pop(context, true);
-        }
-      });
-    } catch (e) {
-      if (mounted) AppNotification.show(message: '右侧图片删除失败：$e', type: NotificationType.error, duration: const Duration(seconds: 3));
+      final result = await widget.onDeleteFiles([widget.image2]);
+      if (!mounted) return;
+      if (result.deletedPaths.contains(widget.image2.filePath)) {
+        Navigator.pop(context, true);
+      }
     } finally {
       if (mounted) setState(() => _isDeletingRight = false);
     }

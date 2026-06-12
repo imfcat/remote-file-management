@@ -39,19 +39,30 @@ class ApiService {
     throw Exception('文件列表加载失败');
   }
 
-  static Future<void> deleteFile(
+  static Future<Map<String, dynamic>> deleteFiles(
       String baseUrl,
-      String filePath, {
-        VoidCallback? onDeleted,
-      }) async {
-    final uri = Uri.parse('$baseUrl/delete_file')
-        .replace(queryParameters: {'file_path': filePath});
-    final res = await http.delete(uri).timeout(_timeout);
+      List<String> filePaths,
+      ) async {
+    if (filePaths.isEmpty) {
+      return {'success_count': 0, 'failed_count': 0, 'results': []};
+    }
+
+    final uri = Uri.parse('$baseUrl/delete_files');
+    final timeout = filePaths.length > 1
+        ? Duration(seconds: 5 * filePaths.length)
+        : _timeout;
+    final res = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'file_paths': filePaths}),
+    ).timeout(timeout);
+
     if (res.statusCode != 200) {
       final msg = res.body.isNotEmpty ? res.body : '删除接口 ${res.statusCode}';
       throw Exception(msg);
     }
-    onDeleted?.call();
+
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   static Future<void> restoreFile(

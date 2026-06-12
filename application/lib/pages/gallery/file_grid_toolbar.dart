@@ -22,6 +22,7 @@ class FileGridToolbar extends StatelessWidget {
   final Function(String) onGroupByChanged;
   final VoidCallback onFindDuplicates;
   final Function(int) onPageSizeChanged;
+  final bool compact;
 
   const FileGridToolbar({
     super.key,
@@ -42,6 +43,7 @@ class FileGridToolbar extends StatelessWidget {
     required this.onGroupByChanged,
     required this.onFindDuplicates,
     required this.onPageSizeChanged,
+    this.compact = false,
   });
 
   List<DropdownMenuItem<int>> _buildPageSizeItems(int currentSize) {
@@ -260,27 +262,51 @@ class FileGridToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final barHeight = compact ? 44.0 : 60.0;
+    final hPadding = compact ? 12.0 : 16.0;
+    final actionStyle = compact
+        ? const TextStyle(color: Colors.white, fontSize: 13)
+        : const TextStyle(color: Colors.white);
+
     if (isSelecting) {
       return Container(
-        height: 60,
+        height: barHeight,
         color: Colors.grey[900],
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.symmetric(horizontal: hPadding),
         child: Row(
           children: [
-            Text('已选择: $selectedCount', style: const TextStyle(color: Colors.white)),
+            Text(
+              '已选择: $selectedCount',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: compact ? 14 : 16,
+              ),
+            ),
             const Spacer(),
             if (showCompareButton)
               TextButton(
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
+                  minimumSize: Size(compact ? 48 : 64, compact ? 32 : 40),
+                ),
                 onPressed: isDeleting ? null : onCompare,
-                child: const Text('图片对比', style: TextStyle(color: Colors.blueAccent)),
+                child: Text('图片对比', style: TextStyle(color: Colors.blueAccent, fontSize: compact ? 13 : 14)),
               ),
             TextButton(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
+                minimumSize: Size(compact ? 40 : 64, compact ? 32 : 40),
+              ),
               onPressed: isDeleting ? null : onCancelSelect,
-              child: const Text('取消', style: TextStyle(color: Colors.white)),
+              child: Text('取消', style: actionStyle),
             ),
             TextButton(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
+                minimumSize: Size(compact ? 56 : 64, compact ? 32 : 40),
+              ),
               onPressed: isDeleting ? null : onDelete,
-              child: const Text('删除所选', style: TextStyle(color: Colors.red)),
+              child: Text('删除所选', style: TextStyle(color: Colors.red, fontSize: compact ? 13 : 14)),
             ),
           ],
         ),
@@ -290,65 +316,79 @@ class FileGridToolbar extends StatelessWidget {
     final settings = Provider.of<SettingsProvider>(context);
     final crossAxisCount = settings.fileListColumnCount;
     final isMobile = MediaQuery.of(context).size.width < 600;
+    final iconSize = compact ? 20.0 : 24.0;
 
     return Container(
-      height: 60,
+      height: barHeight,
       color: Colors.grey[900],
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8),
       child: Row(
         children: [
           if (!isMobile) ...[
             IconButton(
-              icon: const Icon(Icons.remove_circle_outline),
+              icon: Icon(Icons.remove_circle_outline, size: iconSize),
               color: Colors.white,
               disabledColor: Colors.grey[700],
               tooltip: '减少列数',
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
               onPressed: crossAxisCount > 1
                   ? () => settings.setFileListColumnCount(crossAxisCount - 1)
                   : null,
             ),
             Container(
-              constraints: const BoxConstraints(minWidth: 20),
+              constraints: BoxConstraints(minWidth: compact ? 16 : 20),
               alignment: Alignment.center,
               child: Text(
                   '$crossAxisCount',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: compact ? 14 : 16,
+                    fontWeight: FontWeight.bold,
+                  ),
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.add_circle_outline),
+              icon: Icon(Icons.add_circle_outline, size: iconSize),
               color: Colors.white,
               disabledColor: Colors.grey[700],
               tooltip: '增加列数',
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
               onPressed: crossAxisCount < 20
                   ? () => settings.setFileListColumnCount(crossAxisCount + 1)
                   : null,
             ),
           ],
 
-          // 布局切换按钮
           IconButton(
-            icon: Icon(settings.isWaterfallFlow ? Icons.dashboard : Icons.grid_view, color: Colors.white),
+            icon: Icon(settings.isWaterfallFlow ? Icons.dashboard : Icons.grid_view, color: Colors.white, size: iconSize),
             tooltip: settings.isWaterfallFlow ? '切换到网格布局' : '切换到瀑布流布局',
+            padding: EdgeInsets.all(compact ? 6 : 8),
+            constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
             onPressed: () => settings.toggleWaterfallFlow(!settings.isWaterfallFlow),
           ),
-          // 缩略图尺寸切换按钮
           IconButton(
-            icon: Icon(settings.isSmallThumbnail ? Icons.zoom_out : Icons.zoom_in, color: Colors.white),
+            icon: Icon(settings.isSmallThumbnail ? Icons.zoom_out : Icons.zoom_in, color: Colors.white, size: iconSize),
             tooltip: settings.isSmallThumbnail ? '切换到大缩略图' : '切换到小缩略图',
+            padding: EdgeInsets.all(compact ? 6 : 8),
+            constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
             onPressed: () => settings.toggleThumbnailSize(!settings.isSmallThumbnail),
           ),
           if (!settings.isWaterfallFlow)
             IconButton(
-              icon: Icon(settings.isThumbnailCover ? Icons.crop : Icons.aspect_ratio, color: Colors.white),
+              icon: Icon(settings.isThumbnailCover ? Icons.crop : Icons.aspect_ratio, color: Colors.white, size: iconSize),
               tooltip: settings.isThumbnailCover ? '取消缩略图填充' : '开启缩略图填充',
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
               onPressed: () => settings.toggleThumbnailCover(!settings.isThumbnailCover),
             ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.info_outline, color: Colors.white),
+            icon: Icon(Icons.info_outline, color: Colors.white, size: iconSize),
             tooltip: '信息显示设置',
             color: Colors.grey[850],
             position: PopupMenuPosition.under,
+            padding: EdgeInsets.all(compact ? 6 : 8),
             itemBuilder: (_) => [
               CheckedPopupMenuItem(checked: settings.showInfoTitle, value: 'title', child: const Text('标题显示', style: TextStyle(color: Colors.white))),
               CheckedPopupMenuItem(checked: settings.showInfoSize, value: 'size', child: const Text('大小显示', style: TextStyle(color: Colors.white))),
@@ -364,18 +404,18 @@ class FileGridToolbar extends StatelessWidget {
           ),
           const Spacer(),
           if (!isMobile) ...[
-            // 查找重复文件
             IconButton(
-              icon: const Icon(Symbols.document_search_rounded, color: Colors.white),
+              icon: Icon(Symbols.document_search_rounded, color: Colors.white, size: iconSize),
               tooltip: '查找重复图片',
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
               onPressed: onFindDuplicates,
             ),
             const SizedBox(width: 8),
-            // 分页大小选择
             DropdownButton<int>(
               value: pageSize,
               dropdownColor: Colors.grey[850],
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Colors.white, fontSize: compact ? 13 : 14),
               underline: const SizedBox(),
               items: _buildPageSizeItems(pageSize),
               onChanged: (val) {
@@ -387,11 +427,10 @@ class FileGridToolbar extends StatelessWidget {
               },
             ),
             const SizedBox(width: 8),
-            // 分组选择
             DropdownButton<String>(
               value: groupBy,
               dropdownColor: Colors.grey[850],
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Colors.white, fontSize: compact ? 13 : 14),
               underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 'none', child: Text('无分组')),
@@ -404,11 +443,10 @@ class FileGridToolbar extends StatelessWidget {
               },
             ),
             const SizedBox(width: 8),
-            // 排序选择
             DropdownButton<String>(
               value: sortOption,
               dropdownColor: Colors.grey[850],
-              style: const TextStyle(color: Colors.white),
+              style: TextStyle(color: Colors.white, fontSize: compact ? 13 : 14),
               underline: const SizedBox(),
               items: const [
                 DropdownMenuItem(value: 'path-asc', child: Text('路径 正序')),
@@ -427,23 +465,28 @@ class FileGridToolbar extends StatelessWidget {
             const SizedBox(width: 8),
           ] else ...[
             IconButton(
-              icon: const Icon(Icons.tune, color: Colors.white),
+              icon: Icon(Icons.tune, color: Colors.white, size: iconSize),
               tooltip: '视图与排序设置',
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
               onPressed: () => _showMobileSettingsMenu(context),
             ),
           ],
 
-          // 一键折叠展开按钮
           if (groupBy != 'none')
             IconButton(
-              icon: Icon(areAllCollapsed ? Icons.unfold_more : Icons.unfold_less, color: Colors.white),
+              icon: Icon(areAllCollapsed ? Icons.unfold_more : Icons.unfold_less, color: Colors.white, size: iconSize),
               tooltip: areAllCollapsed ? '展开全部分组' : '折叠全部分组',
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
               onPressed: onToggleCollapseAll,
             ),
 
           IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
+            icon: Icon(Icons.refresh, color: Colors.white, size: iconSize),
             tooltip: '刷新文件列表',
+            padding: EdgeInsets.all(compact ? 6 : 8),
+            constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
             onPressed: onRefresh,
           ),
         ],
