@@ -23,6 +23,9 @@ class FileGridToolbar extends StatelessWidget {
   final VoidCallback onFindDuplicates;
   final Function(int) onPageSizeChanged;
   final bool compact;
+  final bool hasGif;
+  final bool playOriginalGif;
+  final VoidCallback? onTogglePlayOriginalGif;
 
   const FileGridToolbar({
     super.key,
@@ -44,6 +47,9 @@ class FileGridToolbar extends StatelessWidget {
     required this.onFindDuplicates,
     required this.onPageSizeChanged,
     this.compact = false,
+    this.hasGif = false,
+    this.playOriginalGif = false,
+    this.onTogglePlayOriginalGif,
   });
 
   List<DropdownMenuItem<int>> _buildPageSizeItems(int currentSize) {
@@ -375,6 +381,18 @@ class FileGridToolbar extends StatelessWidget {
             constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
             onPressed: () => settings.toggleThumbnailSize(!settings.isSmallThumbnail),
           ),
+          if (hasGif)
+            IconButton(
+              icon: Icon(
+                Icons.gif,
+                color: playOriginalGif ? Colors.blue : Colors.white,
+                size: iconSize,
+              ),
+              tooltip: playOriginalGif ? 'GIF' : 'GIF 播放',
+              padding: EdgeInsets.all(compact ? 6 : 8),
+              constraints: compact ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
+              onPressed: onTogglePlayOriginalGif,
+            ),
           if (!settings.isWaterfallFlow)
             IconButton(
               icon: Icon(settings.isThumbnailCover ? Icons.crop : Icons.aspect_ratio, color: Colors.white, size: iconSize),

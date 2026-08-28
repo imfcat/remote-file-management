@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:nya_image_manage/pages/viewer/gif_preview.dart';
 import 'package:nya_image_manage/pages/viewer/video_preview.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
@@ -35,6 +36,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
   bool _uiVisible = true;
   bool _hasDeleted = false;
   bool _showOriginal = false;
+  bool _showGifIndicator = true;
   bool _isDeleting = false;
   SlideDirection _lastDirection = SlideDirection.none;
 
@@ -57,7 +59,10 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       if (current - i >= 0) cacheOrder.add(current - i);
     }
     for (final index in cacheOrder) {
-      final url = mediumUrl(context, widget.files[index].file);
+      final f = widget.files[index];
+      final url = (f.fileType == 'video' || f.mimeType == 'image/gif')
+          ? fileContentUrl(context, f.file)
+          : mediumUrl(context, f.file);
       final fileInfo = await customCacheManager().getFileFromCache(url);
       if (fileInfo == null) {
         customCacheManager().getFileStream(url);
@@ -296,12 +301,21 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               },
               builder: (_, index) {
                 final f = widget.files[index];
+                if (f.mimeType == 'image/gif') {
+                  return PhotoViewGalleryPageOptions.customChild(
+                    child: GifPreview(
+                      imageUrl: fileContentUrl(context, f.file),
+                      uiVisible: _uiVisible,
+                      showIndicator: _showGifIndicator,
+                    ),
+                    minScale: PhotoViewComputedScale.contained,
+                    maxScale: PhotoViewComputedScale.contained,
+                  );
+                }
                 if (f.fileType == 'image') {
-                  final url = f.mimeType == 'image/gif'
+                  final url = _showOriginal
                       ? fileContentUrl(context, f.file)
-                      : (_showOriginal
-                        ? fileContentUrl(context, f.file)
-                        : mediumUrl(context, f.file));
+                      : mediumUrl(context, f.file);
                   return PhotoViewGalleryPageOptions(
                     imageProvider: CachedNetworkImageProvider(
                       url,
@@ -330,7 +344,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
             Positioned(
               left: 0,
               top: 0,
-              bottom: 0,
+              bottom: _uiVisible ? 72 : 0,
               width: clickAreaActualWidth,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -341,7 +355,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
             Positioned(
               right: 0,
               top: 0,
-              bottom: 0,
+              bottom: _uiVisible ? 72 : 0,
               width: clickAreaActualWidth,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -398,6 +412,16 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                       IconButton(
                         icon: Icon(Icons.info_outline, color: Colors.white, shadows: shadows),
                         onPressed: () => _showInfo(context, cf),
+                      ),
+                      if (cf.mimeType == 'image/gif')
+                      IconButton(
+                        icon: Icon(
+                          Icons.animation,
+                          color: _showGifIndicator ? Colors.blue : Colors.white,
+                          shadows: shadows,
+                        ),
+                        tooltip: _showGifIndicator ? '隐藏动画进度' : '显示动画进度',
+                        onPressed: () => setState(() => _showGifIndicator = !_showGifIndicator),
                       ),
                       if (!(cf.fileType == 'video' || cf.mimeType == 'image/gif'))
                       IconButton(

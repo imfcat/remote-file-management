@@ -13,6 +13,7 @@ import '../../widget/notification.dart';
 
 import 'file_item.dart';
 import 'file_grid_toolbar.dart';
+import 'gif_play_budget.dart';
 
 class FileGrid extends StatefulWidget {
   final String folder;
@@ -59,10 +60,13 @@ class _FileGridState extends State<FileGrid> {
   bool _showTopBar = true;
   bool _showBottomBar = true;
   bool _toolbarCompact = false;
+  bool _playOriginalGif = false;
+  final GifPlayBudget _gifPlayBudget = GifPlayBudget();
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _gifPlayBudget.dispose();
     super.dispose();
   }
 
@@ -621,7 +625,11 @@ class _FileGridState extends State<FileGrid> {
     return '根目录';
   }
 
-  Widget _buildItemWidget(FileRecord f, SettingsProvider settings) {
+  Widget _buildItemWidget(
+    FileRecord f,
+    SettingsProvider settings, {
+    required int thumbnailCacheWidth,
+  }) {
     return GestureDetector(
       onTap: () => _handleItemTap(f),
       onLongPress: () {
@@ -638,6 +646,9 @@ class _FileGridState extends State<FileGrid> {
         isSelected: _selectedFiles.contains(f),
         isSmallThumbnail: settings.isSmallThumbnail,
         isThumbnailCover: settings.isThumbnailCover,
+        playOriginalGif: _playOriginalGif,
+        thumbnailCacheWidth: thumbnailCacheWidth,
+        gifPlayBudget: _gifPlayBudget,
       ),
     );
   }
@@ -669,6 +680,13 @@ class _FileGridState extends State<FileGrid> {
       groupBy: _groupBy,
       areAllCollapsed: areAllCollapsed,
       pageSize: pageSize,
+      hasGif: _files.any((f) => f.mimeType == 'image/gif'),
+      playOriginalGif: _playOriginalGif,
+      onTogglePlayOriginalGif: () {
+        setState(() {
+          _playOriginalGif = !_playOriginalGif;
+        });
+      },
       onToggleCollapseAll: () {
         setState(() {
           if (areAllCollapsed) {
@@ -957,6 +975,9 @@ class _FileGridState extends State<FileGrid> {
                         padding -
                         (crossAxisCount - 1) * crossAxisSpacing;
                     final itemWidth = availableWidth / crossAxisCount;
+                    final dpr = MediaQuery.devicePixelRatioOf(context);
+                    final thumbnailCacheWidth =
+                        (itemWidth * dpr).round().clamp(64, 512);
 
                     for (var key in displayKeys) {
                       final groupItems = displayGroups[key]!;
@@ -1022,8 +1043,11 @@ class _FileGridState extends State<FileGrid> {
                                       mainAxisSpacing: 8,
                                     ),
                                 delegate: SliverChildBuilderDelegate(
-                                  (_, i) =>
-                                      _buildItemWidget(groupItems[i], settings),
+                                  (_, i) => _buildItemWidget(
+                                    groupItems[i],
+                                    settings,
+                                    thumbnailCacheWidth: thumbnailCacheWidth,
+                                  ),
                                   childCount: groupItems.length,
                                 ),
                               ),
@@ -1044,7 +1068,11 @@ class _FileGridState extends State<FileGrid> {
                                   final f = groupItems[i];
                                   return SizedBox(
                                     height: _getFastItemHeight(f, itemWidth),
-                                    child: _buildItemWidget(f, settings),
+                                    child: _buildItemWidget(
+                                      f,
+                                      settings,
+                                      thumbnailCacheWidth: thumbnailCacheWidth,
+                                    ),
                                   );
                                 }, childCount: groupItems.length),
                               ),
@@ -1067,7 +1095,7 @@ class _FileGridState extends State<FileGrid> {
                       ),
                       child: CustomScrollView(
                         controller: _scrollController,
-                        cacheExtent: 500,
+                        cacheExtent: _playOriginalGif ? 200 : 500,
                         slivers: slivers,
                       ),
                     );
