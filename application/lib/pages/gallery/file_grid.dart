@@ -16,12 +16,9 @@ import 'file_grid_toolbar.dart';
 
 class FileGrid extends StatefulWidget {
   final String folder;
-  final Function(int totalCount, int totalBytes, String typeSummary)? onFilesUpdated;
-  const FileGrid({
-    super.key,
-    required this.folder,
-    this.onFilesUpdated,
-  });
+  final Function(int totalCount, int totalBytes, String typeSummary)?
+  onFilesUpdated;
+  const FileGrid({super.key, required this.folder, this.onFilesUpdated});
 
   @override
   State<FileGrid> createState() => _FileGridState();
@@ -48,9 +45,15 @@ class _FileGridState extends State<FileGrid> {
   final ScrollController _scrollController = ScrollController();
 
   // 滚动显隐顶栏/底栏
-  static const double _scrollHideThreshold = 56.0;
+  static const double _scrollHideThreshold = 16.0;
+  static const double _scrollShowThreshold = 12.0;
+  static const double _scrollJitter = 0.5;
   static const double _edgeThreshold = 8.0;
+  static const double _toolbarHeight = 60.0;
+  static const double _toolbarCompactHeight = 44.0;
+  static const double _paginationHeight = 54.0;
   double _lastScrollOffset = 0;
+  double _scrollAccum = 0;
   bool _chromeHidden = false;
   bool _showTopBar = true;
   bool _showBottomBar = true;
@@ -76,24 +79,36 @@ class _FileGridState extends State<FileGrid> {
     final offset = position.pixels;
     final maxExtent = position.maxScrollExtent;
     final delta = offset - _lastScrollOffset;
+    _lastScrollOffset = offset;
+
+    if (delta.abs() < _scrollJitter) return;
 
     final atTop = offset <= _edgeThreshold;
-    final atBottom = maxExtent <= _edgeThreshold || (maxExtent - offset) <= _edgeThreshold;
+    final atBottom =
+        maxExtent <= _edgeThreshold || (maxExtent - offset) <= _edgeThreshold;
 
     var chromeHidden = _chromeHidden;
     if (atTop) {
       chromeHidden = false;
-    } else if (delta > _scrollHideThreshold) {
-      chromeHidden = true;
-    } else if (delta < -_scrollHideThreshold) {
-      chromeHidden = false;
+      _scrollAccum = 0;
+    } else {
+      if (_scrollAccum != 0 && delta.sign != _scrollAccum.sign) {
+        _scrollAccum = 0;
+      }
+      _scrollAccum += delta;
+
+      if (!chromeHidden && _scrollAccum > _scrollHideThreshold) {
+        chromeHidden = true;
+        _scrollAccum = 0;
+      } else if (chromeHidden && _scrollAccum < -_scrollShowThreshold) {
+        chromeHidden = false;
+        _scrollAccum = 0;
+      }
     }
 
     final showTop = !chromeHidden || _isSelecting;
     final showBottom = !chromeHidden || atBottom;
     final compact = _isSelecting && chromeHidden;
-
-    _lastScrollOffset = offset;
 
     if (chromeHidden != _chromeHidden ||
         showTop != _showTopBar ||
@@ -105,11 +120,17 @@ class _FileGridState extends State<FileGrid> {
         _showBottomBar = showBottom;
         _toolbarCompact = compact;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _lastScrollOffset = _scrollController.offset;
+        _scrollAccum = 0;
+      });
     }
   }
 
   void _resetScrollChrome() {
     _lastScrollOffset = 0;
+    _scrollAccum = 0;
     setState(() {
       _chromeHidden = false;
       _showTopBar = true;
@@ -130,7 +151,8 @@ class _FileGridState extends State<FileGrid> {
     final offset = _scrollController.offset;
     final maxExtent = _scrollController.position.maxScrollExtent;
     final atTop = offset <= _edgeThreshold;
-    final atBottom = maxExtent <= _edgeThreshold || (maxExtent - offset) <= _edgeThreshold;
+    final atBottom =
+        maxExtent <= _edgeThreshold || (maxExtent - offset) <= _edgeThreshold;
 
     setState(() {
       if (atTop) _chromeHidden = false;
@@ -147,26 +169,35 @@ class _FileGridState extends State<FileGrid> {
       });
     }
 
-    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+    final url = Provider.of<BackendProvider>(
+      context,
+      listen: false,
+    ).backendUrl!;
     ApiService.listFiles(
-      baseUrl: url,
-      folder: widget.folder,
-      sort: _sort,
-      order: _order,
-    ).then((list) {
-      if (!mounted) return;
-      _files = list;
-      _currentPage = 1;
-      _processData();
-      _notifyParentUpdated();
-    }).catchError((e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
+          baseUrl: url,
+          folder: widget.folder,
+          sort: _sort,
+          order: _order,
+        )
+        .then((list) {
+          if (!mounted) return;
+          _files = list;
+          _currentPage = 1;
+          _processData();
+          _notifyParentUpdated();
+        })
+        .catchError((e) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+            });
+            AppNotification.show(
+              message: '列表加载失败: $e',
+              type: NotificationType.error,
+              duration: const Duration(seconds: 3),
+            );
+          }
         });
-        AppNotification.show(message: '列表加载失败: $e', type: NotificationType.error, duration: const Duration(seconds: 3));
-      }
-    });
   }
 
   /// 格式化文件类型分组
@@ -205,14 +236,18 @@ class _FileGridState extends State<FileGrid> {
           _isLoading = isLoading;
         });
       },
-      onSuccess: (Map<String, List<FileRecord>> newGroupedFiles, List<String> newSortedKeys) {
-        setState(() {
-          _groupBy = 'duplicate';
-          _groupedFiles = newGroupedFiles;
-          _sortedKeys = newSortedKeys;
-          _currentPage = 1;
-        });
-      },
+      onSuccess:
+          (
+            Map<String, List<FileRecord>> newGroupedFiles,
+            List<String> newSortedKeys,
+          ) {
+            setState(() {
+              _groupBy = 'duplicate';
+              _groupedFiles = newGroupedFiles;
+              _sortedKeys = newSortedKeys;
+              _currentPage = 1;
+            });
+          },
     );
   }
 
@@ -221,7 +256,9 @@ class _FileGridState extends State<FileGrid> {
     Map<String, List<FileRecord>> tempGroup = {};
     if (_groupBy == 'type') {
       for (var f in _files) {
-        tempGroup.putIfAbsent(f.mimeType.isNotEmpty ? f.mimeType : '未知类型', () => []).add(f);
+        tempGroup
+            .putIfAbsent(f.mimeType.isNotEmpty ? f.mimeType : '未知类型', () => [])
+            .add(f);
       }
     } else if (_groupBy == 'folder') {
       for (var f in _files) {
@@ -322,7 +359,10 @@ class _FileGridState extends State<FileGrid> {
       );
     }
 
-    final url = Provider.of<BackendProvider>(context, listen: false).backendUrl!;
+    final url = Provider.of<BackendProvider>(
+      context,
+      listen: false,
+    ).backendUrl!;
 
     List<FileRecord> validated;
     try {
@@ -470,7 +510,9 @@ class _FileGridState extends State<FileGrid> {
         }
       }
 
-      final currentIndex = displayFiles.indexWhere((item) => item.filePath == f.filePath);
+      final currentIndex = displayFiles.indexWhere(
+        (item) => item.filePath == f.filePath,
+      );
       if (currentIndex == -1) return;
 
       await Navigator.push(
@@ -645,6 +687,7 @@ class _FileGridState extends State<FileGrid> {
       ),
     );
   }
+
   /// 构建动态页码控制器
   Widget _buildPaginationBar(int totalPages) {
     if (totalPages <= 1) return const SizedBox.shrink();
@@ -669,44 +712,49 @@ class _FileGridState extends State<FileGrid> {
 
       if (i > 0 && page - sortedPages[i - 1] > 1) {
         pageWidgets.add(
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Text('...', style: TextStyle(color: Colors.white54, fontSize: 16)),
-            )
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '...',
+              style: TextStyle(color: Colors.white54, fontSize: 16),
+            ),
+          ),
         );
       }
 
       final bool isCurrent = page == _currentPage;
       pageWidgets.add(
-          InkWell(
-            onTap: isCurrent ? null : () {
-              setState(() => _currentPage = page);
-              _scrollController.jumpTo(0);
-              _resetScrollChrome();
-            },
-            borderRadius: BorderRadius.circular(4),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(
-                color: isCurrent ? Colors.blueAccent : Colors.transparent,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: isCurrent ? Colors.blueAccent : Colors.white24,
-                  width: 1,
-                ),
-              ),
-              child: Text(
-                '$page',
-                style: TextStyle(
-                  color: isCurrent ? Colors.white : Colors.white70,
-                  fontSize: 14,
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                ),
+        InkWell(
+          onTap: isCurrent
+              ? null
+              : () {
+                  setState(() => _currentPage = page);
+                  _scrollController.jumpTo(0);
+                  _resetScrollChrome();
+                },
+          borderRadius: BorderRadius.circular(4),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: isCurrent ? Colors.blueAccent : Colors.transparent,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: isCurrent ? Colors.blueAccent : Colors.white24,
+                width: 1,
               ),
             ),
-          )
+            child: Text(
+              '$page',
+              style: TextStyle(
+                color: isCurrent ? Colors.white : Colors.white70,
+                fontSize: 14,
+                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ),
       );
     }
 
@@ -724,11 +772,13 @@ class _FileGridState extends State<FileGrid> {
             icon: const Icon(Icons.chevron_left),
             tooltip: '上一页',
             color: _currentPage > 1 ? Colors.white : Colors.white30,
-            onPressed: _currentPage > 1 ? () {
-              setState(() => _currentPage--);
-              _scrollController.jumpTo(0);
-              _resetScrollChrome();
-            } : null,
+            onPressed: _currentPage > 1
+                ? () {
+                    setState(() => _currentPage--);
+                    _scrollController.jumpTo(0);
+                    _resetScrollChrome();
+                  }
+                : null,
           ),
 
           // 滚动显示的页码按钮排
@@ -736,10 +786,7 @@ class _FileGridState extends State<FileGrid> {
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: pageWidgets,
-              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: pageWidgets),
             ),
           ),
 
@@ -748,11 +795,13 @@ class _FileGridState extends State<FileGrid> {
             icon: const Icon(Icons.chevron_right),
             tooltip: '下一页',
             color: _currentPage < totalPages ? Colors.white : Colors.white30,
-            onPressed: _currentPage < totalPages ? () {
-              setState(() => _currentPage++);
-              _scrollController.jumpTo(0);
-              _resetScrollChrome();
-            } : null,
+            onPressed: _currentPage < totalPages
+                ? () {
+                    setState(() => _currentPage++);
+                    _scrollController.jumpTo(0);
+                    _resetScrollChrome();
+                  }
+                : null,
           ),
         ],
       ),
@@ -766,9 +815,13 @@ class _FileGridState extends State<FileGrid> {
 
     // 分页计算
     final bool isGrouped = _groupBy != 'none';
-    final int pageSize = isGrouped ? settings.pageSizeGrouped : settings.pageSizePure;
+    final int pageSize = isGrouped
+        ? settings.pageSizeGrouped
+        : settings.pageSizePure;
     final int totalItems = isGrouped ? _sortedKeys.length : _files.length;
-    final int totalPages = pageSize <= 0 || totalItems == 0 ? 1 : (totalItems / pageSize).ceil();
+    final int totalPages = pageSize <= 0 || totalItems == 0
+        ? 1
+        : (totalItems / pageSize).ceil();
 
     if (_currentPage > totalPages && totalPages > 0) {
       _currentPage = totalPages;
@@ -795,9 +848,11 @@ class _FileGridState extends State<FileGrid> {
       displayGroups = _groupedFiles;
     }
 
-    final bool areAllCollapsed = displayKeys.isNotEmpty &&
+    final bool areAllCollapsed =
+        displayKeys.isNotEmpty &&
         _collapsedGroups.containsAll(displayKeys) &&
-        displayKeys.length == _collapsedGroups.intersection(displayKeys.toSet()).length;
+        displayKeys.length ==
+            _collapsedGroups.intersection(displayKeys.toSet()).length;
 
     final toolbar = _buildToolbar(
       areAllCollapsed: areAllCollapsed,
@@ -806,6 +861,12 @@ class _FileGridState extends State<FileGrid> {
       settings: settings,
     );
     final paginationBar = _buildPaginationBar(totalPages);
+    final topInset = _showTopBar
+        ? (_toolbarCompact ? _toolbarCompactHeight : _toolbarHeight)
+        : 0.0;
+    final bottomInset = (!_isLoading && totalPages > 1 && _showBottomBar)
+        ? _paginationHeight
+        : 0.0;
 
     return Stack(
       children: [
@@ -813,130 +874,146 @@ class _FileGridState extends State<FileGrid> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : Builder(
-            builder: (context) {
-              List<Widget> slivers = [];
+                  builder: (context) {
+                    List<Widget> slivers = [];
 
-              final screenWidth = MediaQuery.of(context).size.width;
-              final padding = 8.0 * 2;
-              final crossAxisSpacing = 8.0;
-              final availableWidth = screenWidth - padding - (crossAxisCount - 1) * crossAxisSpacing;
-              final itemWidth = availableWidth / crossAxisCount;
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    final padding = 8.0 * 2;
+                    final crossAxisSpacing = 8.0;
+                    final availableWidth =
+                        screenWidth -
+                        padding -
+                        (crossAxisCount - 1) * crossAxisSpacing;
+                    final itemWidth = availableWidth / crossAxisCount;
 
-              for (var key in displayKeys) {
-                final groupItems = displayGroups[key]!;
-                List<Widget> currentGroupSlivers = [];
+                    for (var key in displayKeys) {
+                      final groupItems = displayGroups[key]!;
+                      List<Widget> currentGroupSlivers = [];
 
-                final bool isCollapsed = _collapsedGroups.contains(key);
+                      final bool isCollapsed = _collapsedGroups.contains(key);
 
-                if (_groupBy != 'none') {
-                  currentGroupSlivers.add(
-                    SliverToBoxAdapter(
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            if (isCollapsed) {
-                              _collapsedGroups.remove(key);
-                            } else {
-                              _collapsedGroups.add(key);
-                            }
-                          });
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          child: Row(
-                            children: [
-                              Icon(
-                                isCollapsed ? Icons.chevron_right : Icons.expand_more,
-                                color: Colors.white70,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '$key (${groupItems.length})',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold
+                      if (_groupBy != 'none') {
+                        currentGroupSlivers.add(
+                          SliverToBoxAdapter(
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  if (isCollapsed) {
+                                    _collapsedGroups.remove(key);
+                                  } else {
+                                    _collapsedGroups.add(key);
+                                  }
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isCollapsed
+                                          ? Icons.chevron_right
+                                          : Icons.expand_more,
+                                      color: Colors.white70,
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '$key (${groupItems.length})',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
-                  );
-                }
+                        );
+                      }
 
-                if (_groupBy == 'none' || !isCollapsed) {
-                  if (!settings.isWaterfallFlow) {
-                    currentGroupSlivers.add(
-                      SliverPadding(
-                        padding: const EdgeInsets.all(8),
-                        sliver: SliverGrid(
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            childAspectRatio: 1,
-                            crossAxisSpacing: 8,
-                            mainAxisSpacing: 8,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
-                                (_, i) => _buildItemWidget(groupItems[i], settings),
-                            childCount: groupItems.length,
-                          ),
-                        ),
+                      if (_groupBy == 'none' || !isCollapsed) {
+                        if (!settings.isWaterfallFlow) {
+                          currentGroupSlivers.add(
+                            SliverPadding(
+                              padding: const EdgeInsets.all(8),
+                              sliver: SliverGrid(
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: crossAxisCount,
+                                      childAspectRatio: 1,
+                                      crossAxisSpacing: 8,
+                                      mainAxisSpacing: 8,
+                                    ),
+                                delegate: SliverChildBuilderDelegate(
+                                  (_, i) =>
+                                      _buildItemWidget(groupItems[i], settings),
+                                  childCount: groupItems.length,
+                                ),
+                              ),
+                            ),
+                          );
+                        } else {
+                          currentGroupSlivers.add(
+                            SliverPadding(
+                              padding: const EdgeInsets.all(8),
+                              sliver: SliverWaterfallFlow(
+                                gridDelegate:
+                                    SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: crossAxisCount,
+                                      crossAxisSpacing: 8.0,
+                                      mainAxisSpacing: 8.0,
+                                    ),
+                                delegate: SliverChildBuilderDelegate((_, i) {
+                                  final f = groupItems[i];
+                                  return SizedBox(
+                                    height: _getFastItemHeight(f, itemWidth),
+                                    child: _buildItemWidget(f, settings),
+                                  );
+                                }, childCount: groupItems.length),
+                              ),
+                            ),
+                          );
+                        }
+                      }
+
+                      slivers.add(
+                        SliverMainAxisGroup(slivers: currentGroupSlivers),
+                      );
+                    }
+
+                    Widget scrollViewWidget = AnimatedPadding(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.only(
+                        top: topInset,
+                        bottom: bottomInset,
+                      ),
+                      child: CustomScrollView(
+                        controller: _scrollController,
+                        cacheExtent: 500,
+                        slivers: slivers,
                       ),
                     );
-                  } else {
-                    currentGroupSlivers.add(
-                      SliverPadding(
-                        padding: const EdgeInsets.all(8),
-                        sliver: SliverWaterfallFlow(
-                          gridDelegate: SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 8.0,
-                            mainAxisSpacing: 8.0,
-                          ),
-                          delegate: SliverChildBuilderDelegate(
-                                (_, i) {
-                              final f = groupItems[i];
-                              return SizedBox(
-                                height: _getFastItemHeight(f, itemWidth),
-                                child: _buildItemWidget(f, settings),
-                              );
-                            },
-                            childCount: groupItems.length,
-                          ),
-                        ),
-                      ),
-                    );
-                  }
-                }
 
-                slivers.add(
-                  SliverMainAxisGroup(slivers: currentGroupSlivers),
-                );
-              }
+                    if (settings.showScrollbar) {
+                      return RawScrollbar(
+                        controller: _scrollController,
+                        interactive: true,
+                        thickness: 6,
+                        radius: const Radius.circular(0),
+                        thumbColor: Colors.white12,
+                        child: scrollViewWidget,
+                      );
+                    }
 
-              Widget scrollViewWidget = CustomScrollView(
-                controller: _scrollController,
-                cacheExtent: 500,
-                slivers: slivers,
-              );
-
-              if (settings.showScrollbar) {
-                return RawScrollbar(
-                  controller: _scrollController,
-                  interactive: true,
-                  thickness: 6,
-                  radius: const Radius.circular(0),
-                  thumbColor: Colors.white12,
-                  child: scrollViewWidget,
-                );
-              }
-
-              return scrollViewWidget;
-            },
-          ),
+                    return scrollViewWidget;
+                  },
+                ),
         ),
 
         Positioned(
