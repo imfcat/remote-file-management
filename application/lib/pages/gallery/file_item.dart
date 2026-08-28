@@ -96,15 +96,10 @@ class _FileItemState extends State<FileItem> {
     return '${(bytes / 1048576).toStringAsFixed(1)}MB';
   }
 
-  /// 根据状态获取缩略图URL
-  String _getThumbnailUrl(BuildContext context) {
-    final targetFile = widget.file.fileType == 'video' || _isGif
-        ? '${widget.file.file}.jpg'
-        : widget.file.file;
-
+  CachedMediaRequest _thumbnailRequest(BuildContext context) {
     return widget.isSmallThumbnail
-        ? thumbUrl(context, targetFile)
-        : mediumUrl(context, targetFile);
+        ? thumbMedia(context, widget.file)
+        : mediumMedia(context, widget.file);
   }
 
   /// 文件信息叠加层
@@ -181,23 +176,24 @@ class _FileItemState extends State<FileItem> {
     Widget content;
 
     if (widget.file.fileType == 'image' || widget.file.fileType == 'video') {
-      final url = _playGif
-          ? fileContentUrl(context, widget.file.file)
-          : _getThumbnailUrl(context);
+      final media = _playGif
+          ? originalMedia(context, widget.file)
+          : _thumbnailRequest(context);
       final isVideo = widget.file.fileType == 'video';
 
       content = Stack(
         children: [
           Positioned.fill(
             child: CachedNetworkImage(
-              imageUrl: url,
+              imageUrl: media.url,
+              cacheKey: media.cacheKey,
               fit: fitMode,
               memCacheWidth: _playGif ? widget.thumbnailCacheWidth : null,
               placeholder: (_, _) =>
                   const Center(child: CircularProgressIndicator()),
               errorWidget: (_, _, _) => const Icon(Icons.broken_image),
               cacheManager: customCacheManager(),
-              key: ValueKey('${url}_${widget.isSmallThumbnail}_$_playGif'),
+              key: ValueKey(media.cacheKey),
             ),
           ),
           if (_buildInfoOverlay(settings) != null) _buildInfoOverlay(settings)!,

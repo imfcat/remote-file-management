@@ -68,11 +68,11 @@ class _ImageComparePageState extends State<ImageComparePage> {
   /// 加载图片并转换
   Future<void> _loadImages() async {
     try {
-      final url1 = fileContentUrl(context, widget.image1.file);
-      final url2 = fileContentUrl(context, widget.image2.file);
+      final media1 = originalMedia(context, widget.image1);
+      final media2 = originalMedia(context, widget.image2);
 
-      _uiImage1 = await _loadUiImageFromUrl(url1);
-      _uiImage2 = await _loadUiImageFromUrl(url2);
+      _uiImage1 = await _loadUiImageFromUrl(media1.url, media1.cacheKey);
+      _uiImage2 = await _loadUiImageFromUrl(media2.url, media2.cacheKey);
 
       // 计算像素差异
       if (_uiImage1 != null && _uiImage2 != null) {
@@ -98,8 +98,12 @@ class _ImageComparePageState extends State<ImageComparePage> {
   }
 
   /// 从URL加载ui.Image
-  Future<ui.Image> _loadUiImageFromUrl(String url) async {
-    final imageProvider = CachedNetworkImageProvider(url, cacheManager: customCacheManager());
+  Future<ui.Image> _loadUiImageFromUrl(String url, String cacheKey) async {
+    final imageProvider = CachedNetworkImageProvider(
+      url,
+      cacheKey: cacheKey,
+      cacheManager: customCacheManager(),
+    );
     final completer = Completer<ui.Image>();
 
     final ImageStream stream = imageProvider.resolve(const ImageConfiguration());

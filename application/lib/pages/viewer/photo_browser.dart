@@ -59,13 +59,16 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       if (current - i >= 0) cacheOrder.add(current - i);
     }
     for (final index in cacheOrder) {
+      if (!mounted) return;
       final f = widget.files[index];
-      final url = (f.fileType == 'video' || f.mimeType == 'image/gif')
-          ? fileContentUrl(context, f.file)
-          : mediumUrl(context, f.file);
-      final fileInfo = await customCacheManager().getFileFromCache(url);
+      if (f.fileType == 'video') continue;
+
+      final media = f.mimeType == 'image/gif' || _showOriginal
+          ? originalMedia(context, f)
+          : mediumMedia(context, f);
+      final fileInfo = await customCacheManager().getFileFromCache(media.cacheKey);
       if (fileInfo == null) {
-        customCacheManager().getFileStream(url);
+        customCacheManager().getFileStream(media.url, key: media.cacheKey);
       }
     }
   }
@@ -224,6 +227,7 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
       _showOriginal = !_showOriginal;
     });
     AppNotification.show(message: _showOriginal ? '已切换为原图显示' : '已切换为压缩图显示');
+    _preload(_current);
   }
 
   @override
@@ -302,9 +306,11 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
               builder: (_, index) {
                 final f = widget.files[index];
                 if (f.mimeType == 'image/gif') {
+                  final media = originalMedia(context, f);
                   return PhotoViewGalleryPageOptions.customChild(
                     child: GifPreview(
-                      imageUrl: fileContentUrl(context, f.file),
+                      imageUrl: media.url,
+                      cacheKey: media.cacheKey,
                       uiVisible: _uiVisible,
                       showIndicator: _showGifIndicator,
                     ),
@@ -313,12 +319,13 @@ class _PhotoBrowserState extends State<PhotoBrowser> {
                   );
                 }
                 if (f.fileType == 'image') {
-                  final url = _showOriginal
-                      ? fileContentUrl(context, f.file)
-                      : mediumUrl(context, f.file);
+                  final media = _showOriginal
+                      ? originalMedia(context, f)
+                      : mediumMedia(context, f);
                   return PhotoViewGalleryPageOptions(
                     imageProvider: CachedNetworkImageProvider(
-                      url,
+                      media.url,
+                      cacheKey: media.cacheKey,
                       cacheManager: customCacheManager(),
                     ),
                     minScale: PhotoViewComputedScale.contained * 0.5,

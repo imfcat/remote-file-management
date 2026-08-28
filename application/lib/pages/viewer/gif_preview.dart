@@ -5,12 +5,14 @@ import '../../utils/custom_cache.dart';
 
 class GifPreview extends StatefulWidget {
   final String imageUrl;
+  final String cacheKey;
   final bool uiVisible;
   final bool showIndicator;
 
   const GifPreview({
     super.key,
     required this.imageUrl,
+    required this.cacheKey,
     required this.uiVisible,
     required this.showIndicator,
   });
@@ -56,14 +58,15 @@ class _GifPreviewState extends State<GifPreview>
   @override
   void initState() {
     super.initState();
-    _load(widget.imageUrl, notify: false);
+    _load(widget.imageUrl, widget.cacheKey, notify: false);
   }
 
   @override
   void didUpdateWidget(GifPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageUrl != widget.imageUrl) {
-      _load(widget.imageUrl, notify: true);
+    if (oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.cacheKey != widget.cacheKey) {
+      _load(widget.imageUrl, widget.cacheKey, notify: true);
     }
   }
 
@@ -89,7 +92,11 @@ class _GifPreviewState extends State<GifPreview>
     return duration;
   }
 
-  Future<void> _load(String url, {required bool notify}) async {
+  bool _isCurrentRequest(String url, String cacheKey) {
+    return url == widget.imageUrl && cacheKey == widget.cacheKey;
+  }
+
+  Future<void> _load(String url, String cacheKey, {required bool notify}) async {
     _disposePlayback();
     _loading = true;
     _failed = false;
@@ -98,11 +105,11 @@ class _GifPreviewState extends State<GifPreview>
     if (notify && mounted) setState(() {});
 
     try {
-      final file = await customCacheManager().getSingleFile(url);
-      if (!mounted || url != widget.imageUrl) return;
+      final file = await customCacheManager().getSingleFile(url, key: cacheKey);
+      if (!mounted || !_isCurrentRequest(url, cacheKey)) return;
 
       final bytes = await file.readAsBytes();
-      if (!mounted || url != widget.imageUrl) return;
+      if (!mounted || !_isCurrentRequest(url, cacheKey)) return;
 
       final codec = await ui.instantiateImageCodec(bytes);
       final frames = <_GifFrame>[];
@@ -111,7 +118,7 @@ class _GifPreviewState extends State<GifPreview>
         frames.add(_GifFrame(info.image, _normalizeDuration(info.duration)));
       }
 
-      if (!mounted || url != widget.imageUrl) {
+      if (!mounted || !_isCurrentRequest(url, cacheKey)) {
         for (final frame in frames) {
           frame.image.dispose();
         }
@@ -130,7 +137,7 @@ class _GifPreviewState extends State<GifPreview>
       setState(() {});
     } catch (e) {
       debugPrint('GIF 加载失败：$e');
-      if (!mounted || url != widget.imageUrl) return;
+      if (!mounted || !_isCurrentRequest(url, cacheKey)) return;
       setState(() {
         _loading = false;
         _failed = true;
