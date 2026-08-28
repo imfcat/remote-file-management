@@ -33,6 +33,7 @@ class _FileGridState extends State<FileGrid> {
   Map<String, List<FileRecord>> _groupedFiles = {};
   List<String> _sortedKeys = [];
   final Set<String> _collapsedGroups = {};
+  Map<String, List<String>>? _similarGroupPaths;
 
   // 分页状态
   int _currentPage = 1;
@@ -225,6 +226,45 @@ class _FileGridState extends State<FileGrid> {
     }
   }
 
+  static const String _uniquesGroupKey = '无重复';
+
+  bool get _isSimilarSearchActive => _similarGroupPaths != null;
+
+  void _clearSimilarSearch() {
+    _similarGroupPaths = null;
+  }
+
+  Map<String, List<String>> _pathsByGroup(
+    Map<String, List<FileRecord>> groupedFiles,
+  ) {
+    return {
+      for (final entry in groupedFiles.entries)
+        if (entry.key != _uniquesGroupKey)
+          entry.key: entry.value.map((f) => f.filePath).toList(),
+    };
+  }
+
+  Map<String, List<FileRecord>> _applySimilarGroups() {
+    final groups = _similarGroupPaths!;
+    final tempGroup = <String, List<FileRecord>>{};
+    final used = <String>{};
+
+    for (final entry in groups.entries) {
+      final pathSet = entry.value.toSet();
+      final members = _files.where((f) => pathSet.contains(f.filePath)).toList();
+      if (members.length > 1) {
+        tempGroup[entry.key] = members;
+        used.addAll(members.map((f) => f.filePath));
+      }
+    }
+
+    final uniques = _files.where((f) => !used.contains(f.filePath)).toList();
+    if (uniques.isNotEmpty) {
+      tempGroup[_uniquesGroupKey] = uniques;
+    }
+    return tempGroup;
+  }
+
   /// 查找重复项请求
   void _findDuplicates() {
     DuplicateFinder.execute(
@@ -239,14 +279,12 @@ class _FileGridState extends State<FileGrid> {
       onSuccess:
           (
             Map<String, List<FileRecord>> newGroupedFiles,
-            List<String> newSortedKeys,
+            List<String> _,
           ) {
-            setState(() {
-              _groupBy = 'duplicate';
-              _groupedFiles = newGroupedFiles;
-              _sortedKeys = newSortedKeys;
-              _currentPage = 1;
-            });
+            _similarGroupPaths = _pathsByGroup(newGroupedFiles);
+            _groupBy = 'duplicate';
+            _currentPage = 1;
+            _processData();
           },
     );
   }
@@ -264,6 +302,8 @@ class _FileGridState extends State<FileGrid> {
       for (var f in _files) {
         tempGroup.putIfAbsent(_getGroupFolder(f), () => []).add(f);
       }
+    } else if (_groupBy == 'duplicate' && _isSimilarSearchActive) {
+      tempGroup = _applySimilarGroups();
     } else if (_groupBy == 'duplicate') {
       Map<String, List<FileRecord>> phashGroups = {};
       List<FileRecord> uniques = [];
@@ -287,7 +327,7 @@ class _FileGridState extends State<FileGrid> {
       }
 
       if (uniques.isNotEmpty) {
-        tempGroup['无重复'] = uniques;
+        tempGroup[_uniquesGroupKey] = uniques;
       }
     } else {
       tempGroup = {'全部': _files};
@@ -296,8 +336,8 @@ class _FileGridState extends State<FileGrid> {
     var tempKeys = tempGroup.keys.toList();
     if (_groupBy == 'duplicate') {
       tempKeys.sort((a, b) {
-        if (a == '无重复') return 1;
-        if (b == '无重复') return -1;
+        if (a == _uniquesGroupKey) return 1;
+        if (b == _uniquesGroupKey) return -1;
         int numA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
         int numB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
         return numA.compareTo(numB);
@@ -496,36 +536,67 @@ class _FileGridState extends State<FileGrid> {
     return itemWidth;
   }
 
+  String? _groupKeyOf(FileRecord file) {
+    for (final key in _sortedKeys) {
+      final group = _groupedFiles[key];
+      if (group != null &&
+          group.any((item) => item.filePath == file.filePath)) {
+        return key;
+      }
+    }
+    return null;
+  }
+
+  List<FileRecord> _viewerFilesFor(FileRecord tapped) {
+    if (_groupBy == 'none') {
+      return List<FileRecord>.from(_files);
+    }
+
+    if (_isSimilarSearchActive) {
+      final sourceKey = _groupKeyOf(tapped);
+      if (sourceKey == _uniquesGroupKey) {
+        return List<FileRecord>.from(
+          _groupedFiles[_uniquesGroupKey] ?? const [],
+        );
+      }
+      final similarFiles = <FileRecord>[];
+      for (final key in _sortedKeys) {
+        if (key == _uniquesGroupKey) continue;
+        similarFiles.addAll(_groupedFiles[key] ?? const []);
+      }
+      return similarFiles;
+    }
+
+    final displayFiles = <FileRecord>[];
+    for (final key in _sortedKeys) {
+      displayFiles.addAll(_groupedFiles[key]!);
+    }
+    return displayFiles;
+  }
+
   void _handleItemTap(FileRecord f) async {
     if (_isDeleting) return;
     if (_isSelecting) {
       _toggleFileSelection(f);
-    } else {
-      List<FileRecord> displayFiles = [];
-      if (_groupBy == 'none') {
-        displayFiles = List<FileRecord>.from(_files);
-      } else {
-        for (var key in _sortedKeys) {
-          displayFiles.addAll(_groupedFiles[key]!);
-        }
-      }
-
-      final currentIndex = displayFiles.indexWhere(
-        (item) => item.filePath == f.filePath,
-      );
-      if (currentIndex == -1) return;
-
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PhotoBrowser(
-            files: List<FileRecord>.from(displayFiles),
-            initialIndex: currentIndex,
-            onDeleteFiles: _deleteFiles,
-          ),
-        ),
-      );
+      return;
     }
+
+    final displayFiles = _viewerFilesFor(f);
+    final currentIndex = displayFiles.indexWhere(
+      (item) => item.filePath == f.filePath,
+    );
+    if (currentIndex == -1) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhotoBrowser(
+          files: List<FileRecord>.from(displayFiles),
+          initialIndex: currentIndex,
+          onDeleteFiles: _deleteFiles,
+        ),
+      ),
+    );
   }
 
   String _getGroupFolder(FileRecord f) {
@@ -640,6 +711,7 @@ class _FileGridState extends State<FileGrid> {
             _groupBy = val;
             _collapsedGroups.clear();
             _currentPage = 1;
+            if (val != 'duplicate') _clearSimilarSearch();
           });
           _processData();
         }
